@@ -1,7 +1,5 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import Google from "next-auth/providers/google";
-import GitHub from "next-auth/providers/github";
 
 function getAdapter() {
   if (!process.env.DATABASE_URL) return undefined;
@@ -37,14 +35,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: String(credentials.email),
         };
       },
-    }),
-    Google({
-      clientId: process.env.AUTH_GOOGLE_ID!,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET!,
-    }),
-    GitHub({
-      clientId: process.env.AUTH_GITHUB_ID!,
-      clientSecret: process.env.AUTH_GITHUB_SECRET!,
     }),
   ],
   callbacks: {
