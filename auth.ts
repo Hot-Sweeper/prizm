@@ -9,7 +9,7 @@ import { subscriptions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Explicitly pass secret — auto-detection unreliable in Next.js 16 + Turbopack
+  trustHost: true,
   secret: process.env.AUTH_SECRET,
   adapter: DrizzleAdapter(db, {
     usersTable: users,
