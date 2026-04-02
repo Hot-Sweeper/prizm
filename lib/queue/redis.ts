@@ -1,19 +1,25 @@
 import IORedis from "ioredis";
 
-// Prevent multiple Redis connections in dev hot-reload
 const globalForRedis = globalThis as unknown as {
   redis: IORedis | undefined;
 };
 
-// maxRetriesPerRequest: null is mandatory for BullMQ — it uses blocking commands
-export const redis =
-  globalForRedis.redis ??
-  new IORedis(process.env.REDIS_URL!, {
+function createRedisConnection(): IORedis | undefined {
+  const url = process.env.REDIS_URL;
+  if (!url) {
+    console.warn("[redis] REDIS_URL not set — queue features disabled");
+    return undefined;
+  }
+  return new IORedis(url, {
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
     retryStrategy: (times) => Math.min(times * 1000, 5000),
   });
+}
 
-if (process.env.NODE_ENV !== "production") {
+export const redis =
+  globalForRedis.redis ?? createRedisConnection();
+
+if (process.env.NODE_ENV !== "production" && redis) {
   globalForRedis.redis = redis;
 }

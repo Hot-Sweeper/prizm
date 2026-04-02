@@ -24,3 +24,5 @@ Categories: `FEATURE`, `FIX`, `REFACTOR`, `DOCS`, `INFRA`, `TEST`
 - [2025-04-02] UI: Adjusted model cards hover effect to use CSS variables for conditional glow coloration based on model type (image vs video). Changed glow to a subtle inset blur/bobbing instead of an outer neon beam map.
 
 - [2025-04-02] UI: Fixed ModelCard style replacement failure to ensure image models glow with the correct purple variant, and switched the card hover state to an inner subtle blurred bobbing glow over an aggressive drop-shadow.
+
+- [2025-04-03] INFRA: Fixed Railway deployment failure by adding required \packages\ field in pnpm-workspace.yaml.
