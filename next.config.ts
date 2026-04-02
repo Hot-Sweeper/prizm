@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      { source: "/favicon.ico", destination: "/icon.svg" },
+    ];
+  },
   logging: {
     fetches: {
       fullUrl: true,
