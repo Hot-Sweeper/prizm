@@ -22,12 +22,15 @@ interface EnqueueParams {
 
 /** Enqueues a generation job. Returns the BullMQ job ID. */
 export async function enqueueGeneration(params: EnqueueParams): Promise<string> {
+  if (!redis) {
+    throw new Error("Queue system unavailable — REDIS_URL is not configured");
+  }
+
   // Per-user rate limiting per credit type
   const rateLimitKey = `rate:${params.type}:${params.userId}`;
   const currentCount = await redis.incr(rateLimitKey);
 
   if (currentCount === 1) {
-    // Set TTL only on first increment to avoid resetting the window
     await redis.expire(rateLimitKey, RATE_LIMIT_WINDOW_SECONDS);
   }
 
