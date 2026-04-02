@@ -2,18 +2,23 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-// Prevent multiple postgres connections in dev hot-reload
 const globalForDb = globalThis as unknown as {
   connection: postgres.Sql | undefined;
 };
 
-const connection =
-  globalForDb.connection ??
-  postgres(process.env.DATABASE_URL!, {
+function getConnection() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not set");
+  }
+  return postgres(process.env.DATABASE_URL, {
     max: 10,
     idle_timeout: 20,
     connect_timeout: 10,
   });
+}
+
+const connection =
+  globalForDb.connection ?? getConnection();
 
 if (process.env.NODE_ENV !== "production") {
   globalForDb.connection = connection;

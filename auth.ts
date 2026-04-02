@@ -1,22 +1,26 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
-import { db } from "@/lib/db";
-import { accounts, sessions, users, verificationTokens } from "@/lib/db/schema";
-import { subscriptions } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  trustHost: true,
-  secret: process.env.AUTH_SECRET,
-  adapter: DrizzleAdapter(db, {
+function getAdapter() {
+  if (!process.env.DATABASE_URL) return undefined;
+  // Dynamically require to avoid crashing when DATABASE_URL is missing
+  const { DrizzleAdapter } = require("@auth/drizzle-adapter");
+  const { db } = require("@/lib/db");
+  const { accounts, sessions, users, verificationTokens } = require("@/lib/db/schema");
+  return DrizzleAdapter(db, {
     usersTable: users,
     accountsTable: accounts,
     sessionsTable: sessions,
     verificationTokensTable: verificationTokens,
-  }),
+  });
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
+  secret: process.env.AUTH_SECRET,
+  adapter: getAdapter(),
   session: { strategy: "jwt" },
   providers: [
     // Dummy credentials — accepts any email + any password for local dev
@@ -54,12 +58,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   events: {
-    // Create Stripe customer + default free subscription row on first sign-up
     async createUser({ user }) {
-      if (!user.id) return;
+      if (!user.id || !process.env.DATABASE_URL) return;
 
       try {
-        // Dynamically import to avoid circular deps at module load time
+        const { db } = await import("@/lib/db");
+        const { subscriptions } = await import("@/lib/db/schema");
         const { createStripeCustomer } = await import(
           "@/lib/stripe/subscription"
         );
@@ -76,7 +80,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           stripeCustomerId,
         });
       } catch (err) {
-        // Non-fatal — user can still log in; subscription row created lazily
         console.error("[auth] Failed to bootstrap subscription for user", user.id, err);
       }
     },
