@@ -1,10 +1,11 @@
-export function PrizmLogo({ className = "", size = 24 }: { className?: string; size?: number }) {
+export function PrizmLogo({ className = "", size = 24, style }: { className?: string; size?: number; style?: React.CSSProperties }) {
   return (
     <svg 
       viewBox="0 0 24 24" 
       width={size} 
       height={size} 
       className={className} 
+      style={style}
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
