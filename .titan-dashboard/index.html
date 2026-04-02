@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Dashboard</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <header>
+    <h1 id="project-name">Loading...</h1>
+    <p id="project-domain"></p>
+    <span id="project-phase" class="badge"></span>
+  </header>
+
+  <section class="health-grid" id="health-grid"></section>
+
+  <section class="stats-strip" id="stats-strip"></section>
+
+  <section class="panel">
+    <h2>Tech Stack</h2>
+    <div id="stack-tags" class="tag-list"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Modules</h2>
+    <div id="modules-list"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Changelog</h2>
+    <ul id="changelog-list"></ul>
+  </section>
+
+  <section class="panel">
+    <h2>Blockers</h2>
+    <ul id="blockers-list"></ul>
+    <p id="no-blockers" class="empty" style="display:none;">No blockers — smooth sailing.</p>
+  </section>
+
+  <footer>
+    <p>Powered by <strong>Code Titan v2</strong></p>
+  </footer>
+
+  <script src="assets/dashboard.js"></script>
+</body>
+</html>
