@@ -23,8 +23,8 @@ export const metadata: Metadata = {
 // ─── Static data ────────────────────────────────────────────────────────────
 
 const IMAGE_MODELS = [
-  { name: "Flux 2",           tier: "FREE", cost: "1 cr", desc: "Fast, photorealistic image generation" },
-  { name: "Nano Banana Pro",  tier: "PRO",  cost: "2 cr", desc: "Premium quality with fine detail" },
+  { name: "DALL-E 3",           tier: "FREE", cost: "1 cr", desc: "Fast, versatile image generation" },
+  { name: "GPT Image",          tier: "PRO",  cost: "2 cr", desc: "OpenAI's most advanced image model" },
 ] as const;
 
 const VIDEO_MODELS = [
@@ -37,14 +37,14 @@ const PLANS = [
   {
     name: "Free",
     price: 0,
-    features: ["10 image credits / mo", "Flux 2 model access", "Community queue", "Gallery & downloads"],
+    features: ["10 image credits / mo", "DALL-E 3 model access", "Community queue", "Gallery & downloads"],
     cta: "Start Free",
     highlight: false,
   },
   {
     name: "Pro",
     price: 19,
-    features: ["100 image credits / mo", "10 video credits / mo", "Flux 2 + Nano Banana Pro", "Kling 2.5 + Sora 2", "Priority queue"],
+    features: ["100 image credits / mo", "10 video credits / mo", "DALL-E 3 + GPT Image", "Kling 2.5 + Sora 2", "Priority queue"],
     cta: "Go Pro",
     highlight: true,
   },

@@ -1,20 +1,20 @@
 export const IMAGE_MODELS = {
-  "flux-2": {
-    displayName: "Flux 2",
+  "dall-e-3": {
+    displayName: "DALL-E 3",
     creditCost: 1,
     minTier: "free" as const,
-    description: "Fast, high-quality image generation",
+    description: "Fast, versatile image generation",
   },
-  "nano-banana-pro": {
-    displayName: "Nano Banana Pro",
+  "gpt-image-1": {
+    displayName: "GPT Image",
     creditCost: 2,
     minTier: "pro" as const,
-    description: "Premium quality with enhanced detail",
+    description: "OpenAI's most advanced image model",
   },
 } as const;
 
 export const VIDEO_MODELS = {
-  "kling-2.5": {
+  "kling_video": {
     displayName: "Kling 2.5",
     creditCost: 3,
     minTier: "pro" as const,
@@ -24,10 +24,10 @@ export const VIDEO_MODELS = {
     displayName: "Sora 2",
     creditCost: 5,
     minTier: "pro" as const,
-    description: "OpenAI's latest video model",
+    description: "OpenAI's flagship video generation",
     costPerSecUSD: 0.08,
   },
-  "veo-3.1": {
+  "veo3.1": {
     displayName: "Veo 3.1",
     creditCost: 4,
     minTier: "max" as const,

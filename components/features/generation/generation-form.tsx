@@ -16,8 +16,8 @@ interface GenerationFormProps {
 type GenerationType = "image" | "video";
 
 const DEFAULT_MODELS: Record<GenerationType, string> = {
-  image: "flux-2",
-  video: "kling-2.5",
+  image: "dall-e-3",
+  video: "kling_video",
 };
 
 const MAX_PROMPT_LENGTH = 500;
