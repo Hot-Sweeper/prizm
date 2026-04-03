@@ -5,6 +5,7 @@ import { Image as ImageIcon, VideoCamera as VideoIcon, MagicWand as Wand2 } from
 import { ModelPicker } from "./model-picker";
 import { getModelCreditCost, getModelInfo } from "@/lib/ai/models";
 import { Spinner } from "@/components/ui/spinner";
+import TextareaAutosize from "react-textarea-autosize";
 
 export interface ApiInfo {
   model: string;
@@ -27,8 +28,8 @@ interface GenerationFormProps {
   imageBalance: number;
   videoBalance: number;
   isWhitelisted?: boolean;
-  onJobCreated: (jobId: string) => void;
-  onDirectResult?: (result: DirectResult) => void;
+  onJobCreated: (jobId: string, prompt: string, type: string) => void;
+  onDirectResult?: (result: DirectResult, prompt: string, type: string) => void;
 }
 
 type GenerationType = "image" | "video";
@@ -62,13 +63,14 @@ export function GenerationForm({
   const canSubmit = canAfford && promptValid && !isSubmitting;
 
   function handleTypeChange(newType: GenerationType) {
+    if (newType === type) return;
     setType(newType);
     setModelId(DEFAULT_MODELS[newType]);
     setError(null);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(e?: React.FormEvent) {
+    if (e) e.preventDefault();
     if (!canSubmit) return;
 
     setIsSubmitting(true);
@@ -90,14 +92,14 @@ export function GenerationForm({
 
       // Direct generation: result returned immediately (whitelisted users)
       if (data.status === "completed" && data.url) {
+        onDirectResult?.({ url: data.url, type: data.type, apiInfo: data.apiInfo }, prompt.trim(), type);
         setPrompt("");
-        onDirectResult?.({ url: data.url, type: data.type, apiInfo: data.apiInfo });
         return;
       }
 
       // Queued generation: normal pipeline
+      onJobCreated(data.jobId as string, prompt.trim(), type);
       setPrompt("");
-      onJobCreated(data.jobId as string);
     } catch {
       setError("Network error. Please check your connection and try again.");
     } finally {
@@ -112,57 +114,11 @@ export function GenerationForm({
   const VL = "var(--color-secondary)";
 
   return (
-    <form onSubmit={handleSubmit} noValidate aria-label="Generate AI content" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-
-      {/* Type toggle — pill style */}
-      <div
-        role="group"
-        aria-label="Content type"
-        style={{
-          display: "flex",
-          gap: "6px",
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.07)",
-          borderRadius: "999px",
-          padding: "4px",
-        }}
-      >
-        {(["image", "video"] as GenerationType[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="radio"
-            aria-checked={type === t}
-            onClick={() => handleTypeChange(t)}
-            style={{
-              flex: 1,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: "7px",
-              padding: "9px 20px",
-              borderRadius: "999px",
-              fontSize: "0.875rem", fontWeight: 600,
-              border: "none",
-              cursor: "pointer",
-              transition: "background 0.18s, color 0.18s, box-shadow 0.18s",
-              background: type === t ? V : "transparent",
-              color: type === t ? "#fff" : "rgba(255,255,255,0.45)",
-              boxShadow: type === t ? `0 0 20px ${V}55` : "none",
-            }}
-          >
-            {t === "image" ? <ImageIcon size={15} aria-hidden /> : <VideoIcon size={15} aria-hidden />}
-            {t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {/* Prompt */}
-      <div>
-        <label
-          htmlFor="prompt"
-          style={{ display: "block", marginBottom: "6px", fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}
-        >
-          Prompt <span aria-hidden style={{ color: "#f87171", fontWeight: 400 }}>*</span>
-        </label>
-        <textarea
+    <form onSubmit={handleSubmit} noValidate aria-label="Generate AI content" style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+      
+      {/* Prompt Input */}
+      <div style={{ position: "relative" }}>
+        <TextareaAutosize
           id="prompt"
           name="prompt"
           value={prompt}
@@ -172,72 +128,119 @@ export function GenerationForm({
           aria-describedby={`${promptDescId}${error ? ` ${promptErrorId}` : ""}`}
           aria-invalid={error ? "true" : "false"}
           maxLength={MAX_PROMPT_LENGTH}
-          rows={4}
+          minRows={2}
+          maxRows={6}
           placeholder={
             type === "image"
               ? "A cinematic portrait of a futuristic AI influencer..."
               : "A viral dance trend video with neon lighting..."
           }
           className="dash-input"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (canSubmit) handleSubmit();
+            }
+          }}
           style={{
             width: "100%",
             resize: "none",
-            borderRadius: "0.875rem",
-            border: "1px solid rgba(255,255,255,0.1)",
-            background: "rgba(255,255,255,0.04)",
-            padding: "14px 16px",
-            fontSize: "0.9375rem",
+            borderRadius: "1rem",
+            border: "none",
+            background: "transparent",
+            padding: "0 0 1rem 0",
+            fontSize: "1rem",
             color: "#fff",
-            lineHeight: 1.65,
+            lineHeight: 1.5,
             boxSizing: "border-box",
+            outline: "none",
           }}
         />
-        <div
-          id={promptDescId}
-          style={{ marginTop: "6px", display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "rgba(255,255,255,0.25)" }}
+      </div>
+
+      {error && (
+        <p
+          id={promptErrorId}
+          role="alert"
+          style={{ marginBottom: "12px", fontSize: "0.875rem", color: "#f87171", display: "flex", alignItems: "center", gap: "6px" }}
         >
-          <span>Describe what you want to create</span>
+          {error}
+        </p>
+      )}
+
+      {/* Constraints and Cost */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+        <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.3)" }}>
           <span aria-live="polite" style={{ fontVariantNumeric: "tabular-nums" }}>
             {prompt.length}/{MAX_PROMPT_LENGTH}
           </span>
         </div>
-        {error && (
-          <p
-            id={promptErrorId}
-            role="alert"
-            style={{ marginTop: "8px", fontSize: "0.875rem", color: "#f87171", display: "flex", alignItems: "center", gap: "6px" }}
-          >
-            {error}
-          </p>
-        )}
-      </div>
-
-      {/* Model picker */}
-      <ModelPicker
-        type={type}
-        value={modelId}
-        onChange={setModelId}
-        userTier={userTier}
-        isWhitelisted={isWhitelisted}
-      />
-
-      {/* Credit preview + submit */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", paddingTop: "0.25rem" }}>
-        <p style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.4)" }}>
+        <p style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.4)" }}>
           Cost:{" "}
           <span style={{ fontWeight: 700, color: VL }}>
             {creditCost} {type} credit{creditCost !== 1 ? "s" : ""}
           </span>
-          {selectedModel?.pricingLabel && (
-            <span style={{ marginLeft: "8px", color: "rgba(255,255,255,0.55)", fontVariantNumeric: "tabular-nums" }}>
-              API {selectedModel.pricingLabel}
-            </span>
-          )}
           {!canAfford && (
-            <span style={{ marginLeft: "8px", color: "#f87171", fontWeight: 600 }}>Insufficient credits</span>
+            <span style={{ marginLeft: "8px", color: "#f87171", fontWeight: 600 }}>Insufficient</span>
           )}
         </p>
+      </div>
 
+      {/* Bottom Tool Strip */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", position: "relative" }}>
+        
+        {/* Left Toolbar */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          {/* Type toggles */}
+          <div
+            role="group"
+            aria-label="Content type"
+            style={{
+              display: "flex",
+              gap: "4px",
+              background: "rgba(255,255,255,0.04)",
+              borderRadius: "999px",
+              padding: "4px",
+            }}
+          >
+            {(["image", "video"] as GenerationType[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="radio"
+                aria-checked={type === t}
+                onClick={() => handleTypeChange(t)}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+                  padding: "6px 12px",
+                  borderRadius: "999px",
+                  fontSize: "0.75rem", fontWeight: 600,
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background 0.1s, color 0.1s",
+                  background: type === t ? "rgba(255,255,255,0.15)" : "transparent",
+                  color: type === t ? "#fff" : "rgba(255,255,255,0.45)",
+                }}
+              >
+                {t === "image" ? <ImageIcon size={14} aria-hidden /> : <VideoIcon size={14} aria-hidden />}
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Model Picker Trigger / Popover wrapped component */}
+          <div>
+            <ModelPicker
+              type={type}
+              value={modelId}
+              onChange={setModelId}
+              userTier={userTier}
+              isWhitelisted={isWhitelisted}
+            />
+          </div>
+        </div>
+
+        {/* Generate Button */}
         <button
           type="submit"
           disabled={!canSubmit}
@@ -249,16 +252,16 @@ export function GenerationForm({
             color: "var(--color-primary-text)",
             border: "none",
             borderRadius: "999px",
-            padding: "12px 28px",
-            fontSize: "0.9375rem", fontWeight: 700,
+            padding: "10px 24px",
+            fontSize: "0.875rem", fontWeight: 700,
             cursor: canSubmit ? "pointer" : "not-allowed",
-            boxShadow: canSubmit ? `0 0 28px ${V}55` : "none",
+            boxShadow: canSubmit ? `0 0 24px ${V}66` : "none",
           }}
         >
           {isSubmitting ? (
-            <Spinner size={15} label="Generating..." />
+            <Spinner size={14} label="Generating..." />
           ) : (
-            <Wand2 size={15} aria-hidden />
+            <Wand2 size={14} aria-hidden />
           )}
           {isSubmitting ? "Generating..." : "Generate"}
         </button>

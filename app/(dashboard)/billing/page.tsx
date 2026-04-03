@@ -37,7 +37,7 @@ export default async function BillingPage() {
   };
 
   return (
-    <main id="maincontent" tabIndex={-1} style={{ color: "#fff", fontFamily: "var(--font-sans)" }}>
+    <main id="maincontent" tabIndex={-1} style={{ maxWidth: "1024px", margin: "0 auto", padding: "2rem 1.5rem", width: "100%", overflowY: "auto", height: "100%", color: "#fff", fontFamily: "var(--font-sans)" }}>
 
       {/* Page heading */}
       <div style={{ marginBottom: "2rem" }}>

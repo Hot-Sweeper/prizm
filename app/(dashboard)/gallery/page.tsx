@@ -23,7 +23,7 @@ export default async function GalleryPage({ searchParams }: GalleryPageProps) {
   const jobs = await getUserJobs(session.user.id, currentPage).catch(() => []);
 
   return (
-    <main id="maincontent" tabIndex={-1}>
+    <main id="maincontent" tabIndex={-1} style={{ maxWidth: "1280px", margin: "0 auto", padding: "2rem 1.5rem", width: "100%", overflowY: "auto", height: "100%" }}>
       <h1 className="font-display" style={{ fontSize: "2rem", letterSpacing: "0.06em", color: "#fff", marginBottom: "1.75rem" }}>
         GALLERY
       </h1>
