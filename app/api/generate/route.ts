@@ -4,14 +4,13 @@ import { generationJobs } from "@/lib/db/schema";
 import { deductCredits } from "@/lib/credits";
 import { isWhitelistedEmail } from "@/lib/credits/whitelist";
 import { enqueueGeneration } from "@/lib/queue/enqueue";
+import { cometClient } from "@/lib/ai/comet-client";
 import {
   IMAGE_MODELS,
   VIDEO_MODELS,
   getModelCreditCost,
   isImageModel,
   isVideoModel,
-  type ImageModelId,
-  type VideoModelId,
 } from "@/lib/ai/models";
 import { getSubscriptionByUserId } from "@/lib/stripe/subscription";
 import { TIER_PRIORITY } from "@/lib/queue/job-types";
@@ -35,6 +34,91 @@ const TIER_MODEL_ACCESS: Record<
   max: ["free", "pro", "max"],
 };
 
+/**
+ * Direct CometAPI call for whitelisted users — bypasses DB, queue, and R2.
+ */
+async function directGenerate(
+  type: "image" | "video",
+  modelId: string,
+  prompt: string,
+) {
+  const startTime = Date.now();
+  const modelInfo = type === "image" ? IMAGE_MODELS[modelId] : VIDEO_MODELS[modelId];
+
+  try {
+    let url: string;
+    let rawUsage: unknown = null;
+
+    if (type === "image") {
+      const response = await cometClient.images.generate({
+        model: modelId,
+        prompt,
+        n: 1,
+        size: "1024x1024",
+        response_format: "url",
+      });
+      const first = response.data?.[0];
+      if (!first?.url) throw new Error("CometAPI returned no image URL");
+      url = first.url;
+      rawUsage = (response as unknown as Record<string, unknown>).usage ?? null;
+    } else {
+      const response = await fetch("https://api.cometapi.com/v1/videos/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.COMETAPI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: modelId,
+          prompt,
+          duration: 5,
+          aspect_ratio: "16:9",
+        }),
+      });
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Video generation failed (${response.status}): ${errorBody}`);
+      }
+      const data = (await response.json()) as Record<string, unknown>;
+      url = data.url as string;
+      rawUsage = data.usage ?? null;
+      if (!url) throw new Error("CometAPI returned no video URL");
+    }
+
+    const generationTimeMs = Date.now() - startTime;
+
+    return NextResponse.json({
+      status: "completed",
+      url,
+      type,
+      apiInfo: {
+        model: modelId,
+        modelName: modelInfo?.displayName ?? modelId,
+        provider: modelInfo?.provider ?? "Unknown",
+        generationTimeMs,
+        estimatedCostUSD: modelInfo?.estimatedCostUSD ?? null,
+        usage: rawUsage,
+      },
+    });
+  } catch (err) {
+    const generationTimeMs = Date.now() - startTime;
+    return NextResponse.json(
+      {
+        status: "failed",
+        error: err instanceof Error ? err.message : "Generation failed",
+        apiInfo: {
+          model: modelId,
+          modelName: modelInfo?.displayName ?? modelId,
+          provider: modelInfo?.provider ?? "Unknown",
+          generationTimeMs,
+          estimatedCostUSD: modelInfo?.estimatedCostUSD ?? null,
+        },
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -50,9 +134,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { prompt, modelId, type, settings } = parsed.data;
+  const { prompt, modelId, type } = parsed.data;
 
-  // Validate the model ID is known and matches the requested type
   if (type === "image" && !isImageModel(modelId)) {
     return NextResponse.json({ error: "Unknown image model" }, { status: 400 });
   }
@@ -60,30 +143,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown video model" }, { status: 400 });
   }
 
-  // Check the user's subscription tier and model access
+  // Whitelisted users: direct CometAPI call — no DB, no queue, no credits
+  if (isWhitelistedEmail(session.user.email)) {
+    return directGenerate(type, modelId, prompt);
+  }
+
+  // ── Normal pipeline: DB → credits → BullMQ queue ──
   const subscription = await getSubscriptionByUserId(session.user.id);
   const tier = subscription?.tier ?? "free";
 
-  // Type-safe model lookup — type already validated via isImageModel/isVideoModel above
-  const modelInfo =
-    type === "image"
-      ? IMAGE_MODELS[modelId as ImageModelId]
-      : VIDEO_MODELS[modelId as VideoModelId];
+  const modelInfo = type === "image" ? IMAGE_MODELS[modelId] : VIDEO_MODELS[modelId];
+  if (!modelInfo) {
+    return NextResponse.json({ error: "Model not found" }, { status: 400 });
+  }
   const allowedTiers = TIER_MODEL_ACCESS[tier];
 
   if (!allowedTiers.includes(modelInfo.minTier)) {
     return NextResponse.json(
-      {
-        error: `This model requires ${modelInfo.minTier} tier or higher`,
-        requiredTier: modelInfo.minTier,
-      },
+      { error: `This model requires ${modelInfo.minTier} tier or higher`, requiredTier: modelInfo.minTier },
       { status: 403 }
     );
   }
 
   const creditCost = getModelCreditCost(modelId);
 
-  // Insert job row first to get the DB ID for credit ledger reference
   const [newJob] = await db
     .insert(generationJobs)
     .values({
@@ -92,7 +175,7 @@ export async function POST(request: Request) {
       status: "queued",
       modelId,
       prompt,
-      settings: settings ?? null,
+      settings: null,
       queuePriority: TIER_PRIORITY[tier],
       creditCost,
     })
@@ -102,27 +185,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create job" }, { status: 500 });
   }
 
-  // Whitelisted emails skip credit deduction entirely
-  const whitelisted = isWhitelistedEmail(session.user.email);
+  const deduction = await deductCredits({
+    userId: session.user.id,
+    creditType: type,
+    amount: creditCost,
+    jobId: newJob.id,
+  });
 
-  if (!whitelisted) {
-    const deduction = await deductCredits({
-      userId: session.user.id,
-      creditType: type,
-      amount: creditCost,
-      jobId: newJob.id,
-    });
-
-    if (!deduction.success) {
-      await db.delete(generationJobs).where(eq(generationJobs.id, newJob.id));
-      return NextResponse.json(
-        { error: "Insufficient credits", balance: deduction.newBalance },
-        { status: 402 }
-      );
-    }
+  if (!deduction.success) {
+    await db.delete(generationJobs).where(eq(generationJobs.id, newJob.id));
+    return NextResponse.json(
+      { error: "Insufficient credits", balance: deduction.newBalance },
+      { status: 402 }
+    );
   }
 
-  // Enqueue into BullMQ — this is the only point where CometAPI work is scheduled
   let bullJobId: string;
   try {
     bullJobId = await enqueueGeneration({
@@ -131,40 +208,17 @@ export async function POST(request: Request) {
       type,
       prompt,
       modelId,
-      settings,
       tier,
     });
   } catch (err) {
-    // Rate limit or queue error — refund the credit deduction
-    await db.insert(generationJobs).values({
-      userId: session.user.id,
-      type,
-      status: "failed",
-      modelId,
-      prompt,
-      creditCost,
-      errorMessage: err instanceof Error ? err.message : "Enqueue failed",
-      queuePriority: TIER_PRIORITY[tier],
-    });
-
-    // Refund not automated in MVP — log for manual review
-    console.error("[generate] Enqueue failed after credit deduction", {
-      userId: session.user.id,
-      jobId: newJob.id,
-      error: err,
-    });
-
+    console.error("[generate] Enqueue failed after credit deduction", { userId: session.user.id, jobId: newJob.id, error: err });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to queue generation" },
       { status: 429 }
     );
   }
 
-  // Store the BullMQ job ID for polling
-  await db
-    .update(generationJobs)
-    .set({ bullJobId })
-    .where(eq(generationJobs.id, newJob.id));
+  await db.update(generationJobs).set({ bullJobId }).where(eq(generationJobs.id, newJob.id));
 
   return NextResponse.json({ jobId: newJob.id, status: "queued" }, { status: 201 });
 }

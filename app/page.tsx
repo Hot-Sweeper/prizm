@@ -24,34 +24,41 @@ export const metadata: Metadata = {
 
 const IMAGE_MODELS = [
   { name: "DALL-E 3",           tier: "FREE", cost: "1 cr", desc: "Fast, versatile image generation" },
-  { name: "GPT Image",          tier: "PRO",  cost: "2 cr", desc: "OpenAI's most advanced image model" },
+  { name: "GPT Image",          tier: "PRO",  cost: "2 cr", desc: "Most advanced image model" },
+  { name: "Flux Schnell",       tier: "FREE", cost: "1 cr", desc: "Fastest Flux model" },
+  { name: "Ideogram V3",        tier: "PRO",  cost: "2 cr", desc: "Balanced quality and speed" },
+  { name: "Flux 2 Max",         tier: "MAX",  cost: "4 cr", desc: "Maximum quality Flux 2" },
+  { name: "SD 3.5 Large",       tier: "PRO",  cost: "2 cr", desc: "Stable Diffusion 3.5" },
 ] as const;
 
 const VIDEO_MODELS = [
-  { name: "Kling 2.5", tier: "PRO",  cost: "3 cr", desc: "High-quality motion, physics-aware" },
-  { name: "Sora 2",    tier: "PRO",  cost: "5 cr", desc: "OpenAI's flagship video generation" },
-  { name: "Veo 3.1",   tier: "MAX",  cost: "4 cr", desc: "Google's cinematic video model" },
+  { name: "Kling 2.5",          tier: "PRO",  cost: "3 cr", desc: "High-quality motion, physics-aware" },
+  { name: "Sora 2",             tier: "PRO",  cost: "5 cr", desc: "OpenAI flagship video" },
+  { name: "Veo 3.1",            tier: "PRO",  cost: "4 cr", desc: "Latest Google video model" },
+  { name: "Luma Dream Machine", tier: "PRO",  cost: "4 cr", desc: "Luma AI video generation" },
+  { name: "Runway Gen-3",       tier: "MAX",  cost: "5 cr", desc: "Runway Gen-3 Alpha video" },
+  { name: "Sora 2 Pro",         tier: "MAX",  cost: "8 cr", desc: "Highest quality Sora" },
 ] as const;
 
 const PLANS = [
   {
     name: "Free",
     price: 0,
-    features: ["10 image credits / mo", "DALL-E 3 model access", "Community queue", "Gallery & downloads"],
+    features: ["10 image credits / mo", "4 free-tier models", "Community queue", "Gallery & downloads"],
     cta: "Start Free",
     highlight: false,
   },
   {
     name: "Pro",
     price: 19,
-    features: ["100 image credits / mo", "10 video credits / mo", "DALL-E 3 + GPT Image", "Kling 2.5 + Sora 2", "Priority queue"],
+    features: ["100 image credits / mo", "10 video credits / mo", "20+ image models", "12+ video models", "Priority queue"],
     cta: "Go Pro",
     highlight: true,
   },
   {
     name: "Max",
     price: 49,
-    features: ["500 image credits / mo", "50 video credits / mo", "All 5 models incl. Veo 3.1", "Top-priority queue bypass", "Monthly credit rollover"],
+    features: ["500 image credits / mo", "50 video credits / mo", "All 35+ models unlocked", "Top-priority queue bypass", "Monthly credit rollover"],
     cta: "Go Max",
     highlight: false,
   },
@@ -263,7 +270,7 @@ export default async function LandingPage() {
         >
           <dl style={{ maxWidth: "960px", margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "2rem", textAlign: "center" }}>
             {[
-              { value: "5",     label: "AI Models",              color: VLL },
+              { value: "35+",   label: "AI Models",              color: VLL },
               { value: "~5s",   label: "Avg. image generation",  color: VLL },
               { value: "Free",  label: "To start — no card needed", color: VLL },
             ].map((s) => (
@@ -367,7 +374,7 @@ export default async function LandingPage() {
               CHOOSE YOUR WEAPON
             </h2>
             <p style={{ textAlign: "center", color: "rgba(255,255,255,0.4)", maxWidth: "440px", margin: "0 auto 3.5rem", lineHeight: 1.7 }}>
-              Five hand-picked models for viral imagery and cinematic video. Not demos &mdash; real production tools.
+              35+ models from OpenAI, Google, Flux, Stability AI, Runway, Luma &amp; more. Not demos &mdash; real production tools.
             </p>
 
             {/* Image models */}

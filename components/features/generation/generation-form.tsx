@@ -6,11 +6,27 @@ import { ModelPicker } from "./model-picker";
 import { getModelCreditCost } from "@/lib/ai/models";
 import { Spinner } from "@/components/ui/spinner";
 
+export interface ApiInfo {
+  model: string;
+  modelName: string;
+  provider: string;
+  generationTimeMs: number;
+  estimatedCostUSD: number | null;
+  usage?: unknown;
+}
+
+export interface DirectResult {
+  url: string;
+  type: string;
+  apiInfo: ApiInfo;
+}
+
 interface GenerationFormProps {
   userTier: "free" | "pro" | "max";
   imageBalance: number;
   videoBalance: number;
   onJobCreated: (jobId: string) => void;
+  onDirectResult?: (result: DirectResult) => void;
 }
 
 type GenerationType = "image" | "video";
@@ -27,6 +43,7 @@ export function GenerationForm({
   imageBalance,
   videoBalance,
   onJobCreated,
+  onDirectResult,
 }: GenerationFormProps) {
   const [type, setType] = useState<GenerationType>("image");
   const [prompt, setPrompt] = useState("");
@@ -67,6 +84,14 @@ export function GenerationForm({
         return;
       }
 
+      // Direct generation: result returned immediately (whitelisted users)
+      if (data.status === "completed" && data.url) {
+        setPrompt("");
+        onDirectResult?.({ url: data.url, type: data.type, apiInfo: data.apiInfo });
+        return;
+      }
+
+      // Queued generation: normal pipeline
       setPrompt("");
       onJobCreated(data.jobId as string);
     } catch {
@@ -225,7 +250,7 @@ export function GenerationForm({
           ) : (
             <Wand2 size={15} aria-hidden />
           )}
-          {isSubmitting ? "Queuing..." : "Generate"}
+          {isSubmitting ? "Generating..." : "Generate"}
         </button>
       </div>
     </form>
