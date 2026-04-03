@@ -149,7 +149,7 @@ export function GenerationForm({
           style={{
             width: "100%",
             resize: "none",
-            borderRadius: "1rem",
+            borderRadius: "0",
             border: "none",
             background: "transparent",
             padding: "0 0 1rem 0",
@@ -158,6 +158,7 @@ export function GenerationForm({
             lineHeight: 1.5,
             boxSizing: "border-box",
             outline: "none",
+            caretColor: "var(--color-secondary)",
           }}
         />
       </div>
