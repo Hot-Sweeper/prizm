@@ -14,7 +14,9 @@ interface Job {
   prompt: string;
   resultUrl: string | null;
   createdAt: string;
+  updatedAt?: string;
   errorMessage?: string | null;
+  generationTimeMs?: number;
 }
 
 export function HistoryCard({
@@ -28,6 +30,8 @@ export function HistoryCard({
 }) {
   const [flipped, setFlipped] = useState(false);
   const modelInfo = job.modelId ? getModelInfo(job.modelId) : null;
+
+  const durationMs = job.generationTimeMs || (job.updatedAt ? new Date(job.updatedAt).getTime() - new Date(job.createdAt).getTime() : 0);
 
   return (
     <div
@@ -126,8 +130,15 @@ export function HistoryCard({
             >
               <ArrowCounterClockwise size={14} /> Use Setup
             </button>
-            <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "0.65rem", color: "rgba(255,255,255,0.3)" }}>
-              <Clock size={12} /> {new Date(job.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              {durationMs > 0 && job.status === "completed" && (
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "0.65rem", color: "var(--color-secondary)", whiteSpace: "nowrap" }}>
+                  <Clock size={12} /> {(durationMs / 1000).toFixed(1)}s
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "0.65rem", color: "rgba(255,255,255,0.3)", whiteSpace: "nowrap" }}>
+                {new Date(job.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </div>
             </div>
           </div>
         </div>

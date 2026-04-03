@@ -23,6 +23,7 @@ export async function getUserJobs(userId: string, page = 1) {
       errorMessage: true,
       creditCost: true,
       createdAt: true,
+      updatedAt: true,
     },
   });
 }

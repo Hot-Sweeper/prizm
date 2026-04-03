@@ -42,6 +42,7 @@ async function directGenerate(
   type: "image" | "video",
   modelId: string,
   prompt: string,
+  settings?: Record<string, unknown>
 ) {
   const startTime = Date.now();
   const modelInfo = getModelInfo(modelId);
@@ -64,7 +65,10 @@ async function directGenerate(
               contents: [{ role: "user", parts: [{ text: prompt }] }],
               generationConfig: {
                 responseModalities: ["IMAGE"],
-                imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+                imageConfig: { 
+                  aspectRatio: (settings?.aspectRatio as string) ?? "1:1", 
+                  imageSize: (settings?.resolution as string) ?? "1K" 
+                },
               },
             }),
           }
@@ -120,7 +124,7 @@ async function directGenerate(
           model: modelId,
           prompt,
           duration: 5,
-          aspect_ratio: "16:9",
+          aspect_ratio: (settings?.aspectRatio as string) ?? "16:9",
         }),
       });
       if (!response.ok) {
@@ -195,7 +199,7 @@ export async function POST(request: Request) {
 
   // Whitelisted users: direct CometAPI call — no DB, no queue, no credits
   if (isWhitelistedEmail(session.user.email)) {
-    return directGenerate(type, modelId, prompt);
+    return directGenerate(type, modelId, prompt, parsed.data.settings);
   }
 
   // ── Normal pipeline: DB → credits → BullMQ queue ──
@@ -233,7 +237,7 @@ export async function POST(request: Request) {
       status: "queued",
       modelId,
       prompt,
-      settings: null,
+      settings: parsed.data.settings ?? null,
       queuePriority: TIER_PRIORITY[tier],
       creditCost,
     })

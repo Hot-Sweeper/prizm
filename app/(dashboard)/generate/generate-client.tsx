@@ -19,6 +19,8 @@ interface GenerationJob {
   errorMessage: string | null;
   creditCost: number;
   createdAt: Date | string | null;
+  updatedAt?: Date | string | null;
+  generationTimeMs?: number;
 }
 
 interface GenerateClientProps {
@@ -57,6 +59,7 @@ export function GenerateClient({
       errorMessage: null,
       creditCost: 0,
       createdAt: new Date().toISOString(),
+      generationTimeMs: result.apiInfo.generationTimeMs,
     };
     setHistory((prev) => [newJob, ...prev]);
   }
@@ -135,6 +138,7 @@ export function GenerateClient({
                   errorMessage: null,
                   creditCost: 0,
                   createdAt: new Date().toISOString(),
+                  generationTimeMs: res.apiInfo.generationTimeMs,
                 };
                 setHistory((prev) => [newJob, ...prev]);
               }}
