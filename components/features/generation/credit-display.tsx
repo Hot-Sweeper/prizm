@@ -8,10 +8,21 @@ interface CreditDisplayProps {
 }
 
 const VL = "var(--color-secondary)";
+const UNLIMITED_BALANCE_THRESHOLD = 999_999;
+
+function isUnlimitedBalance(balance: number): boolean {
+  return balance >= UNLIMITED_BALANCE_THRESHOLD;
+}
+
+function formatBalance(balance: number): string {
+  return isUnlimitedBalance(balance) ? "∞" : balance.toString();
+}
 
 export function CreditDisplay({ imageBalance, videoBalance }: CreditDisplayProps) {
-  const lowImage = imageBalance < 5;
-  const lowVideo = videoBalance < 3;
+  const unlimitedImage = isUnlimitedBalance(imageBalance);
+  const unlimitedVideo = isUnlimitedBalance(videoBalance);
+  const lowImage = !unlimitedImage && imageBalance < 5;
+  const lowVideo = !unlimitedVideo && videoBalance < 3;
 
   return (
     <div
@@ -35,8 +46,9 @@ export function CreditDisplay({ imageBalance, videoBalance }: CreditDisplayProps
             fontVariantNumeric: "tabular-nums",
             color: lowImage ? "#fbbf24" : "#fff",
           }}
+          aria-label={unlimitedImage ? "Unlimited image credits" : `${imageBalance} image credits`}
         >
-          {imageBalance}
+          {formatBalance(imageBalance)}
         </span>
         {lowImage && <AlertCircle size={11} aria-label="Low image credits" style={{ color: "#fbbf24" }} />}
       </div>
@@ -53,8 +65,9 @@ export function CreditDisplay({ imageBalance, videoBalance }: CreditDisplayProps
             fontVariantNumeric: "tabular-nums",
             color: lowVideo ? "#fbbf24" : "#fff",
           }}
+          aria-label={unlimitedVideo ? "Unlimited video credits" : `${videoBalance} video credits`}
         >
-          {videoBalance}
+          {formatBalance(videoBalance)}
         </span>
         {lowVideo && <AlertCircle size={11} aria-label="Low video credits" style={{ color: "#fbbf24" }} />}
       </div>
