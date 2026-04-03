@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { generationJobs } from "@/lib/db/schema";
 import { deductCredits } from "@/lib/credits";
+import { isWhitelistedEmail } from "@/lib/credits/whitelist";
 import { enqueueGeneration } from "@/lib/queue/enqueue";
 import {
   IMAGE_MODELS,
@@ -101,21 +102,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create job" }, { status: 500 });
   }
 
-  // Atomically deduct credits — uses FOR UPDATE lock to prevent race conditions
-  const deduction = await deductCredits({
-    userId: session.user.id,
-    creditType: type,
-    amount: creditCost,
-    jobId: newJob.id,
-  });
+  // Whitelisted emails skip credit deduction entirely
+  const whitelisted = isWhitelistedEmail(session.user.email);
 
-  if (!deduction.success) {
-    // Roll back the job row since we can't pay for it
-    await db.delete(generationJobs).where(eq(generationJobs.id, newJob.id));
-    return NextResponse.json(
-      { error: "Insufficient credits", balance: deduction.newBalance },
-      { status: 402 }
-    );
+  if (!whitelisted) {
+    const deduction = await deductCredits({
+      userId: session.user.id,
+      creditType: type,
+      amount: creditCost,
+      jobId: newJob.id,
+    });
+
+    if (!deduction.success) {
+      await db.delete(generationJobs).where(eq(generationJobs.id, newJob.id));
+      return NextResponse.json(
+        { error: "Insufficient credits", balance: deduction.newBalance },
+        { status: 402 }
+      );
+    }
   }
 
   // Enqueue into BullMQ — this is the only point where CometAPI work is scheduled
