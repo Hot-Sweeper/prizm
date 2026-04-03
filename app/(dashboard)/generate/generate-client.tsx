@@ -4,6 +4,7 @@ import { useState } from "react";
 import { GenerationForm } from "@/components/features/generation/generation-form";
 import type { DirectResult, ApiInfo } from "@/components/features/generation/generation-form";
 import { QueueStatus } from "@/components/features/generation/queue-status";
+import { HistoryCard } from "@/components/features/generation/history-card";
 import { CreditDisplay } from "@/components/features/generation/credit-display";
 import { Sparkle as Sparkles, Timer, CurrencyDollar, Cpu, Lightning, Clock } from "@phosphor-icons/react/dist/ssr";
 import Image from "next/image";
@@ -37,13 +38,12 @@ export function GenerateClient({
   isWhitelisted = false,
   initialHistory,
 }: GenerateClientProps) {
-  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [activeJobIds, setActiveJobIds] = useState<string[]>([]);
   const [latestResultUrl, setLatestResultUrl] = useState<string | null>(null);
   const [latestResultType, setLatestResultType] = useState<string | null>(null);
   const [history, setHistory] = useState<GenerationJob[]>(initialHistory);
 
   function handleDirectResult(result: DirectResult) {
-    setActiveJobId(null);
     setLatestResultUrl(result.url);
     setLatestResultType(result.type);
     
@@ -62,7 +62,7 @@ export function GenerateClient({
   }
 
   function handleJobCreated(jobId: string, prompt: string, type: string) {
-    setActiveJobId(jobId);
+    setActiveJobIds((prev) => [jobId, ...prev]);
     setLatestResultUrl(null);
     const newJob: GenerationJob = {
       id: jobId,
@@ -85,7 +85,7 @@ export function GenerateClient({
         
         {/* Canvas / Latest Result Area */}
         <div style={{ flex: 1, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem", paddingBottom: "160px" }}>
-          {!latestResultUrl && !activeJobId ? (
+          {!latestResultUrl && activeJobIds.length === 0 ? (
             <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
               <div style={{ width: "80px", height: "80px", borderRadius: "2rem", background: "rgba(124,58,237,0.06)", border: "1px solid rgba(167,139,250,0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: VL }}>
                 <Sparkles size={36} weight="duotone" aria-hidden />
@@ -123,7 +123,6 @@ export function GenerateClient({
               isWhitelisted={isWhitelisted}
               onJobCreated={(jobId, prompt, type) => handleJobCreated(jobId, prompt, type)}
               onDirectResult={(res, prompt, type) => {
-                setActiveJobId(null);
                 setLatestResultUrl(res.url);
                 setLatestResultType(res.type);
                 const newJob: GenerationJob = {
@@ -156,44 +155,45 @@ export function GenerateClient({
         </div>
 
         <div className="model-picker-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "0.5rem 1.5rem 1.5rem 1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {activeJobId && (
-            <div style={{ padding: "1rem", background: "rgba(124,58,237,0.1)", border: `1px solid ${VL}`, borderRadius: "1rem" }}>
+          {activeJobIds.map(id => (
+            <div key={id} style={{ padding: "1rem", background: "rgba(124,58,237,0.1)", border: `1px solid ${VL}`, borderRadius: "1rem" }}>
               <div style={{ fontSize: "0.75rem", color: VL, fontWeight: 700, letterSpacing: "0.05em", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <div style={{ width: "8px", height: "8px", background: VL, borderRadius: "50%", animation: "pulse 1.5s infinite" }} />
                 ACTIVE GENERATION
               </div>
-              <QueueStatus jobId={activeJobId} onComplete={(url) => { setActiveJobId(null); setLatestResultUrl(url); }} />
+              <QueueStatus 
+                jobId={id} 
+                onComplete={(url) => { 
+                  setActiveJobIds(prev => prev.filter(j => j !== id));
+                  setLatestResultUrl(url); 
+                  setHistory(prev => prev.map(j => j.id === id ? { ...j, status: "completed", resultUrl: url } : j));
+                }} 
+              />
             </div>
-          )}
+          ))}
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {history.map((job) => (
-              <div key={job.id} onClick={() => { if(job.resultUrl) { setLatestResultUrl(job.resultUrl); setLatestResultType(job.type); } }} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "1rem", overflow: "hidden", display: "flex", flexDirection: "column", cursor: job.resultUrl ? "pointer" : "default" }}>
-                {job.resultUrl ? (
-                  <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", background: "#000" }}>
-                    {job.type === "video" ? (
-                      <video src={job.resultUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : (
-                      <Image src={job.resultUrl} alt={job.prompt} fill style={{ objectFit: "cover" }} unoptimized />
-                    )}
-                  </div>
-                ) : (
-                   <div style={{ padding: "1.5rem", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid rgba(255,255,255,0.05)", background: "rgba(0,0,0,0.3)" }}>
-                     {job.status === "failed" ? (
-                       <span style={{ color: "var(--color-danger)", fontSize: "0.8rem", fontWeight: 600 }}>FAILED</span>
-                     ) : (
-                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "rgba(255,255,255,0.5)" }}>
-                         <Clock size={16} /> <span style={{ fontSize: "0.8rem", fontWeight: 500 }}>{job.status.toUpperCase()}</span>
-                       </div>
-                     )}
-                   </div>
-                )}
-                <div style={{ padding: "0.75rem 1rem", fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {job.prompt}
-                </div>
-              </div>
+            {history.filter(job => !activeJobIds.includes(job.id)).map((job) => (
+              <HistoryCard
+                key={job.id}
+                job={job as any}
+                onClick={() => {
+                  if (job.resultUrl) {
+                    setLatestResultUrl(job.resultUrl);
+                    setLatestResultType(job.type);
+                  }
+                }}
+                onUseSetup={(usedJob) => {
+                  const el = document.getElementById("prompt") as HTMLTextAreaElement;
+                  if (el) {
+                    el.value = usedJob.prompt;
+                    const e = new Event("input", { bubbles: true });
+                    el.dispatchEvent(e);
+                  }
+                }}
+              />
             ))}
-            {history.length === 0 && !activeJobId && (
+            {history.length === 0 && activeJobIds.length === 0 && (
               <p style={{ fontSize: "0.85rem", color: "rgba(255,255,255,0.3)", textAlign: "center", marginTop: "2rem" }}>
                 Your generated images will appear here.
               </p>

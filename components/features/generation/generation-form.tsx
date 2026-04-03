@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Image as ImageIcon, VideoCamera as VideoIcon, MagicWand as Wand2 } from "@phosphor-icons/react/dist/ssr";
 import { ModelPicker } from "./model-picker";
+import { AspectRatioPicker } from "./aspect-ratio-picker";
 import { getModelCreditCost, getModelInfo } from "@/lib/ai/models";
 import { Spinner } from "@/components/ui/spinner";
 import TextareaAutosize from "react-textarea-autosize";
@@ -52,6 +53,7 @@ export function GenerationForm({
   const [type, setType] = useState<GenerationType>("image");
   const [prompt, setPrompt] = useState("");
   const [modelId, setModelId] = useState(DEFAULT_MODELS.image);
+  const [aspectRatio, setAspectRatio] = useState("16:9");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,7 +82,7 @@ export function GenerationForm({
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), modelId, type }),
+        body: JSON.stringify({ prompt: prompt.trim(), modelId, type, settings: { aspectRatio } }),
       });
 
       const data = await response.json();
@@ -135,7 +137,7 @@ export function GenerationForm({
               ? "A cinematic portrait of a futuristic AI influencer..."
               : "A viral dance trend video with neon lighting..."
           }
-          className="dash-input"
+          className="prompt-textarea"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -228,8 +230,8 @@ export function GenerationForm({
             ))}
           </div>
 
-          {/* Model Picker Trigger / Popover wrapped component */}
-          <div>
+          {/* Settings Pickers */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <ModelPicker
               type={type}
               value={modelId}
@@ -237,6 +239,12 @@ export function GenerationForm({
               userTier={userTier}
               isWhitelisted={isWhitelisted}
             />
+            {type === "image" && (
+              <AspectRatioPicker
+                value={aspectRatio}
+                onChange={setAspectRatio}
+              />
+            )}
           </div>
         </div>
 
