@@ -170,7 +170,7 @@ export function GenerateClient({
                 onComplete={(url) => { 
                   setActiveJobIds(prev => prev.filter(j => j !== id));
                   setLatestResultUrl(url); 
-                  setHistory(prev => prev.map(j => j.id === id ? { ...j, status: "completed", resultUrl: url } : j));
+                  setHistory(prev => prev.map(j => j.id === id ? { ...j, status: "completed", resultUrl: url, updatedAt: new Date().toISOString() } : j));
                 }} 
               />
             </div>
