@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Image as ImageIcon, VideoCamera as VideoIcon, MagicWand as Wand2 } from "@phosphor-icons/react/dist/ssr";
 import { ModelPicker } from "./model-picker";
-import { getModelCreditCost } from "@/lib/ai/models";
+import { getModelCreditCost, getModelInfo } from "@/lib/ai/models";
 import { Spinner } from "@/components/ui/spinner";
 
 export interface ApiInfo {
@@ -12,6 +12,7 @@ export interface ApiInfo {
   provider: string;
   generationTimeMs: number;
   estimatedCostUSD: number | null;
+  pricingLabel?: string;
   usage?: unknown;
 }
 
@@ -25,6 +26,7 @@ interface GenerationFormProps {
   userTier: "free" | "pro" | "max";
   imageBalance: number;
   videoBalance: number;
+  isWhitelisted?: boolean;
   onJobCreated: (jobId: string) => void;
   onDirectResult?: (result: DirectResult) => void;
 }
@@ -42,6 +44,7 @@ export function GenerationForm({
   userTier,
   imageBalance,
   videoBalance,
+  isWhitelisted = false,
   onJobCreated,
   onDirectResult,
 }: GenerationFormProps) {
@@ -52,6 +55,7 @@ export function GenerationForm({
   const [error, setError] = useState<string | null>(null);
 
   const creditCost = modelId ? getModelCreditCost(modelId) : 0;
+  const selectedModel = modelId ? getModelInfo(modelId) : null;
   const balance = type === "image" ? imageBalance : videoBalance;
   const canAfford = balance >= creditCost;
   const promptValid = prompt.trim().length >= 3;
@@ -214,6 +218,7 @@ export function GenerationForm({
         value={modelId}
         onChange={setModelId}
         userTier={userTier}
+        isWhitelisted={isWhitelisted}
       />
 
       {/* Credit preview + submit */}
@@ -223,6 +228,11 @@ export function GenerationForm({
           <span style={{ fontWeight: 700, color: VL }}>
             {creditCost} {type} credit{creditCost !== 1 ? "s" : ""}
           </span>
+          {selectedModel?.pricingLabel && (
+            <span style={{ marginLeft: "8px", color: "rgba(255,255,255,0.55)", fontVariantNumeric: "tabular-nums" }}>
+              API {selectedModel.pricingLabel}
+            </span>
+          )}
           {!canAfford && (
             <span style={{ marginLeft: "8px", color: "#f87171", fontWeight: 600 }}>Insufficient credits</span>
           )}

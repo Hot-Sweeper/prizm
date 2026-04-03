@@ -258,6 +258,53 @@ video {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
+.model-picker-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-primary) 68%, white 8%) rgba(255, 255, 255, 0.06);
+}
+
+.model-picker-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.model-picker-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+
+.model-picker-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-secondary) 70%, white 8%),
+    color-mix(in srgb, var(--color-primary) 80%, black 10%)
+  );
+  border-radius: 999px;
+  border: 2px solid rgba(10, 10, 10, 0.85);
+}
+
+.model-picker-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-accent) 72%, white 12%),
+    color-mix(in srgb, var(--color-primary) 88%, black 8%)
+  );
+}
+
+@media (forced-colors: active) {
+  .model-picker-scrollbar {
+    scrollbar-color: ButtonText Canvas;
+  }
+
+  .model-picker-scrollbar::-webkit-scrollbar-track {
+    background: Canvas;
+  }
+
+  .model-picker-scrollbar::-webkit-scrollbar-thumb {
+    background: ButtonText;
+    border-color: Canvas;
+  }
+}
+
 /* Plan CTA hover */
 .plan-cta {
   transition: opacity 0.2s, transform 0.2s;

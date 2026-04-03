@@ -11,6 +11,7 @@ interface GenerateClientProps {
   userTier: "free" | "pro" | "max";
   imageBalance: number;
   videoBalance: number;
+  isWhitelisted?: boolean;
 }
 
 const VL = "var(--color-secondary)";
@@ -42,6 +43,7 @@ function ApiCostPanel({ apiInfo }: { apiInfo: ApiInfo }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
         <CostRow icon={<Cpu size={13} aria-hidden />} label="Model" value={apiInfo.modelName} />
         <CostRow icon={<Lightning size={13} aria-hidden />} label="Provider" value={apiInfo.provider} />
+        <CostRow icon={<CurrencyDollar size={13} aria-hidden />} label="API Rate" value={apiInfo.pricingLabel ?? "N/A"} />
         <CostRow
           icon={<Timer size={13} aria-hidden />}
           label="Time"
@@ -49,7 +51,7 @@ function ApiCostPanel({ apiInfo }: { apiInfo: ApiInfo }) {
         />
         <CostRow
           icon={<CurrencyDollar size={13} aria-hidden />}
-          label="Est. Cost"
+          label="Req. Cost"
           value={apiInfo.estimatedCostUSD != null ? `$${apiInfo.estimatedCostUSD.toFixed(3)}` : "N/A"}
           highlight
         />
@@ -79,6 +81,7 @@ export function GenerateClient({
   userTier,
   imageBalance,
   videoBalance,
+  isWhitelisted = false,
 }: GenerateClientProps) {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [latestResultUrl, setLatestResultUrl] = useState<string | null>(null);
@@ -126,6 +129,7 @@ export function GenerateClient({
           userTier={userTier}
           imageBalance={imageBalance}
           videoBalance={videoBalance}
+          isWhitelisted={isWhitelisted}
           onJobCreated={(jobId) => {
             setActiveJobId(jobId);
             setLatestResultUrl(null);

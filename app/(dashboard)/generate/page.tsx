@@ -34,6 +34,7 @@ export default async function GeneratePage() {
         userTier={tier}
         imageBalance={balances.image}
         videoBalance={balances.video}
+        isWhitelisted={whitelisted}
       />
     </main>
   );

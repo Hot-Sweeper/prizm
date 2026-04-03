@@ -9,6 +9,7 @@ import {
   IMAGE_MODELS,
   VIDEO_MODELS,
   getModelCreditCost,
+  getModelInfo,
   isImageModel,
   isVideoModel,
 } from "@/lib/ai/models";
@@ -43,24 +44,71 @@ async function directGenerate(
   prompt: string,
 ) {
   const startTime = Date.now();
-  const modelInfo = type === "image" ? IMAGE_MODELS[modelId] : VIDEO_MODELS[modelId];
+  const modelInfo = getModelInfo(modelId);
 
   try {
     let url: string;
     let rawUsage: unknown = null;
 
     if (type === "image") {
-      const response = await cometClient.images.generate({
-        model: modelId,
-        prompt,
-        n: 1,
-        size: "1024x1024",
-        response_format: "url",
-      });
-      const first = response.data?.[0];
-      if (!first?.url) throw new Error("CometAPI returned no image URL");
-      url = first.url;
-      rawUsage = (response as unknown as Record<string, unknown>).usage ?? null;
+      if (modelInfo?.transport === "gemini-image") {
+        const response = await fetch(
+          `https://api.cometapi.com/v1beta/models/${modelId}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": process.env.COMETAPI_API_KEY ?? "",
+            },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: {
+                responseModalities: ["IMAGE"],
+                imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+              },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(`Gemini image generation failed (${response.status}): ${errorBody}`);
+        }
+
+        const data = (await response.json()) as {
+          candidates?: Array<{
+            content?: {
+              parts?: Array<{
+                inlineData?: { mimeType?: string; data?: string };
+              }>;
+            };
+          }>;
+          usageMetadata?: unknown;
+        };
+
+        const parts = data.candidates?.[0]?.content?.parts ?? [];
+        const imagePart = parts.find((part) => part.inlineData?.data);
+        const inlineData = imagePart?.inlineData;
+
+        if (!inlineData?.data) {
+          throw new Error("Nano Banana returned no image data");
+        }
+
+        url = `data:${inlineData.mimeType ?? "image/png"};base64,${inlineData.data}`;
+        rawUsage = data.usageMetadata ?? null;
+      } else {
+        const response = await cometClient.images.generate({
+          model: modelId,
+          prompt,
+          n: 1,
+          size: "1024x1024",
+          response_format: "url",
+        });
+        const first = response.data?.[0];
+        if (!first?.url) throw new Error("CometAPI returned no image URL");
+        url = first.url;
+        rawUsage = (response as unknown as Record<string, unknown>).usage ?? null;
+      }
     } else {
       const response = await fetch("https://api.cometapi.com/v1/videos/generate", {
         method: "POST",
@@ -97,6 +145,7 @@ async function directGenerate(
         provider: modelInfo?.provider ?? "Unknown",
         generationTimeMs,
         estimatedCostUSD: modelInfo?.estimatedCostUSD ?? null,
+        pricingLabel: modelInfo?.pricingLabel,
         usage: rawUsage,
       },
     });
@@ -112,6 +161,7 @@ async function directGenerate(
           provider: modelInfo?.provider ?? "Unknown",
           generationTimeMs,
           estimatedCostUSD: modelInfo?.estimatedCostUSD ?? null,
+          pricingLabel: modelInfo?.pricingLabel,
         },
       },
       { status: 500 }
@@ -156,6 +206,14 @@ export async function POST(request: Request) {
   if (!modelInfo) {
     return NextResponse.json({ error: "Model not found" }, { status: 400 });
   }
+
+  if (modelInfo.directOnly) {
+    return NextResponse.json(
+      { error: "This model is currently available in direct test mode for whitelisted users only" },
+      { status: 403 }
+    );
+  }
+
   const allowedTiers = TIER_MODEL_ACCESS[tier];
 
   if (!allowedTiers.includes(modelInfo.minTier)) {

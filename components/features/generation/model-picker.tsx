@@ -1,7 +1,8 @@
 "use client";
 
 import { Lock } from "@phosphor-icons/react/dist/ssr";
-import { IMAGE_MODELS, VIDEO_MODELS, getProviderGroups } from "@/lib/ai/models";
+import { getProviderGroups } from "@/lib/ai/models";
+import { ModelBrandIcon } from "./model-brand-icon";
 
 type GenerationType = "image" | "video";
 
@@ -10,11 +11,12 @@ interface ModelPickerProps {
   value: string;
   onChange: (modelId: string) => void;
   userTier: "free" | "pro" | "max";
+  isWhitelisted?: boolean;
 }
 
 const TIER_ORDER = { free: 0, pro: 1, max: 2 };
 
-export function ModelPicker({ type, value, onChange, userTier }: ModelPickerProps) {
+export function ModelPicker({ type, value, onChange, userTier, isWhitelisted = false }: ModelPickerProps) {
   const groups = getProviderGroups(type);
 
   return (
@@ -25,7 +27,8 @@ export function ModelPicker({ type, value, onChange, userTier }: ModelPickerProp
       <div
         role="radiogroup"
         aria-label="Select generation model"
-        style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "340px", overflowY: "auto", paddingRight: "4px" }}
+        className="model-picker-scrollbar"
+        style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "340px", overflowY: "auto", paddingRight: "6px" }}
       >
         {Object.entries(groups).map(([provider, models]) => (
           <div key={provider}>
@@ -36,17 +39,20 @@ export function ModelPicker({ type, value, onChange, userTier }: ModelPickerProp
               {provider}
             </div>
             {models.map(({ id, info: model }) => {
-              const locked = TIER_ORDER[model.minTier] > TIER_ORDER[userTier];
+              const locked = TIER_ORDER[model.minTier] > TIER_ORDER[userTier] || (!!model.directOnly && !isWhitelisted);
               const checked = value === id;
               const V = "var(--color-primary)";
               const VL = "var(--color-secondary)";
+              const unavailableReason = model.directOnly && !isWhitelisted
+                ? "Available in direct test mode for whitelisted users"
+                : `Requires ${model.minTier} plan`;
 
               return (
                 <label
                   key={id}
                   data-disabled={locked ? "true" : undefined}
                   className={`model-radio-card${checked ? " model-radio-selected" : ""}`}
-                  title={locked ? `Requires ${model.minTier} plan` : undefined}
+                  title={locked ? unavailableReason : undefined}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     borderRadius: "0.75rem",
@@ -77,15 +83,35 @@ export function ModelPicker({ type, value, onChange, userTier }: ModelPickerProp
                       disabled={locked}
                       onChange={() => !locked && onChange(id)}
                       className="sr-only"
-                      aria-label={`${model.displayName}${locked ? ` (requires ${model.minTier} plan)` : ""}`}
+                      aria-label={`${model.displayName}${locked ? ` (${unavailableReason.toLowerCase()})` : ""}`}
                     />
+                    <ModelBrandIcon model={model} active={checked} />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.8rem", fontWeight: 600, color: "#fff" }}>
                         {model.displayName}
                         {locked && <Lock size={10} aria-hidden style={{ color: "rgba(255,255,255,0.3)" }} />}
+                        {model.directOnly && isWhitelisted && (
+                          <span
+                            style={{
+                              fontSize: "0.55rem",
+                              fontWeight: 800,
+                              letterSpacing: "0.12em",
+                              textTransform: "uppercase",
+                              color: VL,
+                              background: "rgba(255,255,255,0.06)",
+                              padding: "1px 5px",
+                              borderRadius: "999px",
+                            }}
+                          >
+                            Direct
+                          </span>
+                        )}
                       </div>
                       <p style={{ fontSize: "0.675rem", color: "rgba(255,255,255,0.3)", marginTop: "1px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {model.description}
+                      </p>
+                      <p style={{ fontSize: "0.625rem", color: checked ? VL : "rgba(255,255,255,0.46)", marginTop: "3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontVariantNumeric: "tabular-nums" }}>
+                        API {model.pricingLabel}
                       </p>
                     </div>
                   </div>
