@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Image as ImageIcon, VideoCamera as VideoIcon, MagicWand as Wand2 } from "@phosphor-icons/react/dist/ssr";
 import { ModelPicker } from "./model-picker";
 import { AspectRatioPicker } from "./aspect-ratio-picker";
+import { ResolutionPicker } from "./resolution-picker";
 import { getModelCreditCost, getModelInfo } from "@/lib/ai/models";
 import { Spinner } from "@/components/ui/spinner";
 import TextareaAutosize from "react-textarea-autosize";
@@ -54,6 +55,7 @@ export function GenerationForm({
   const [prompt, setPrompt] = useState("");
   const [modelId, setModelId] = useState(DEFAULT_MODELS.image);
   const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [resolution, setResolution] = useState("2K");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,7 +84,7 @@ export function GenerationForm({
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), modelId, type, settings: { aspectRatio } }),
+        body: JSON.stringify({ prompt: prompt.trim(), modelId, type, settings: { aspectRatio, resolution } }),
       });
 
       const data = await response.json();
@@ -240,10 +242,18 @@ export function GenerationForm({
               isWhitelisted={isWhitelisted}
             />
             {type === "image" && (
-              <AspectRatioPicker
-                value={aspectRatio}
-                onChange={setAspectRatio}
-              />
+              <>
+                <AspectRatioPicker
+                  value={aspectRatio}
+                  onChange={setAspectRatio}
+                />
+                {(modelId.includes("nano") || modelId.includes("banana") || modelId.includes("gemini")) && (
+                  <ResolutionPicker
+                    value={resolution}
+                    onChange={setResolution}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>

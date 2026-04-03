@@ -46,25 +46,45 @@ export function AspectRatioPicker({ value, onChange }: Props) {
           borderRadius: "1rem", padding: "6px", display: "flex", flexDirection: "column", gap: "2px",
           boxShadow: "0 10px 40px rgba(0,0,0,0.8)", zIndex: 100, backdropFilter: "blur(20px)"
         }}>
-          {RATIOS.map(r => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => { onChange(r); setIsOpen(false); }}
-              style={{
-                width: "100%", padding: "6px 12px", borderRadius: "0.5rem",
-                background: value === r ? "rgba(124,58,237,0.12)" : "transparent",
-                color: value === r ? "var(--color-secondary)" : "#fff",
-                border: value === r ? "1px solid rgba(167,139,250,0.55)" : "1px solid transparent",
-                cursor: "pointer", fontSize: "0.75rem", fontWeight: 600,
-                textAlign: "left", whiteSpace: "nowrap"
-              }}
-              onMouseEnter={(e) => { if (value !== r) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
-              onMouseLeave={(e) => { if (value !== r) e.currentTarget.style.background = "transparent"; }}
-            >
-              {r}
-            </button>
-          ))}
+          {RATIOS.map(r => {
+            // compute width/height for visualizing the ratio
+            const parts = r.split(":").map(Number);
+            const w = parts[0] || 1;
+            const h = parts[1] || 1;
+            const isLandscape = w > h;
+            const maxDim = 14; 
+            const calcW = isLandscape ? maxDim : Math.floor((w / h) * maxDim);
+            const calcH = isLandscape ? Math.floor((h / w) * maxDim) : maxDim;
+
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => { onChange(r); setIsOpen(false); }}
+                style={{
+                  width: "100%", padding: "6px 12px", borderRadius: "0.5rem",
+                  background: value === r ? "rgba(124,58,237,0.12)" : "transparent",
+                  color: value === r ? "var(--color-secondary)" : "#fff",
+                  border: value === r ? "1px solid rgba(167,139,250,0.55)" : "1px solid transparent",
+                  cursor: "pointer", fontSize: "0.75rem", fontWeight: 600,
+                  display: "flex", alignItems: "center", gap: "10px", whiteSpace: "nowrap"
+                }}
+                onMouseEnter={(e) => { if (value !== r) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                onMouseLeave={(e) => { if (value !== r) e.currentTarget.style.background = "transparent"; }}
+              >
+                <div style={{
+                  width: "16px", height: "16px", display: "flex", alignItems: "center", justifyContent: "center"
+                }}>
+                  <div style={{
+                    width: `${calcW}px`, height: `${calcH}px`,
+                    border: `1px solid ${value === r ? "var(--color-secondary)" : "rgba(255,255,255,0.5)"}`,
+                    borderRadius: "2px", transition: "all 0.2s"
+                  }} />
+                </div>
+                {r}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
