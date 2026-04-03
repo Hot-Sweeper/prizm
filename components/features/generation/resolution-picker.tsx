@@ -8,7 +8,7 @@ interface Props {
   onChange: (value: string) => void;
 }
 
-const RESOLUTIONS = ["1K", "2K", "4K", "8K"];
+const RESOLUTIONS = ["1K", "2K", "4K"];
 
 export function ResolutionPicker({ value, onChange }: Props) {
   const [isOpen, setIsOpen] = useState(false);
