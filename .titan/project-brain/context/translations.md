@@ -20,7 +20,10 @@
 
 | User says... | They mean... |
 |---|---|
-| *(to be filled as conversations happen)* | |
+| datenbank | Database (German) |
+| throbber | Loading spinner / animated loading indicator |
+| chatbox | The prompt/generation form area at the bottom of the studio |
+| yk / ykyk | "you know" — informal agreement/acknowledgment |
 
 ## Project-Specific
 

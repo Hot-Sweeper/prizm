@@ -26,3 +26,7 @@ Categories: `FEATURE`, `FIX`, `REFACTOR`, `DOCS`, `INFRA`, `TEST`
 - [2025-04-02] UI: Fixed ModelCard style replacement failure to ensure image models glow with the correct purple variant, and switched the card hover state to an inner subtle blurred bobbing glow over an aggressive drop-shadow.
 
 - [2025-04-03] INFRA: Fixed Railway deployment failure by adding required \packages\ field in pnpm-workspace.yaml.
+
+- [2025-04-05] FEATURE: All generations (including whitelisted direct) now persist to database. Direct generations save completed job with resultUrl to generationJobs table. Failed direct attempts also logged.
+- [2025-04-05] UI: Redesigned sidebar active job cards with animated spinner throbber, shimmer effect, prompt text preview, and "Queued" badge with pulsing dot. Added global `spin` and `pulse` keyframes to globals.css.
+- [2025-04-05] FEATURE: Image upload in generation form — drag & drop, Ctrl+V paste, and upload button. Supports PNG/JPEG/WebP/GIF, max 5 images at 10 MB each. Reference images sent as base64 data URLs through API and stored in job settings.

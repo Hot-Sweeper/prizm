@@ -24,6 +24,10 @@ const generateSchema = z.object({
   modelId: z.string(),
   type: z.enum(["image", "video"]),
   settings: z.record(z.string(), z.unknown()).optional(),
+  referenceImages: z
+    .array(z.string().max(15_000_000))
+    .max(5)
+    .optional(),
 });
 
 const TIER_MODEL_ACCESS: Record<
@@ -36,9 +40,10 @@ const TIER_MODEL_ACCESS: Record<
 };
 
 /**
- * Direct CometAPI call for whitelisted users — bypasses DB, queue, and R2.
+ * Direct CometAPI call for whitelisted users — bypasses queue and R2 but persists to DB.
  */
 async function directGenerate(
+  userId: string,
   type: "image" | "video",
   modelId: string,
   prompt: string,
@@ -139,7 +144,24 @@ async function directGenerate(
 
     const generationTimeMs = Date.now() - startTime;
 
+    const [savedJob] = await db
+      .insert(generationJobs)
+      .values({
+        userId,
+        type,
+        status: "completed",
+        modelId,
+        prompt,
+        settings: settings ?? null,
+        queuePriority: 0,
+        creditCost: 0,
+        resultUrl: url,
+        updatedAt: new Date(),
+      })
+      .returning({ id: generationJobs.id });
+
     return NextResponse.json({
+      jobId: savedJob?.id ?? null,
       status: "completed",
       url,
       type,
@@ -155,10 +177,28 @@ async function directGenerate(
     });
   } catch (err) {
     const generationTimeMs = Date.now() - startTime;
+    const errorMsg = err instanceof Error ? err.message : "Generation failed";
+
+    await db
+      .insert(generationJobs)
+      .values({
+        userId,
+        type,
+        status: "failed",
+        modelId,
+        prompt,
+        settings: settings ?? null,
+        queuePriority: 0,
+        creditCost: 0,
+        errorMessage: errorMsg,
+        updatedAt: new Date(),
+      })
+      .catch(() => {});
+
     return NextResponse.json(
       {
         status: "failed",
-        error: err instanceof Error ? err.message : "Generation failed",
+        error: errorMsg,
         apiInfo: {
           model: modelId,
           modelName: modelInfo?.displayName ?? modelId,
@@ -188,7 +228,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { prompt, modelId, type } = parsed.data;
+  const { prompt, modelId, type, referenceImages } = parsed.data;
 
   if (type === "image" && !isImageModel(modelId)) {
     return NextResponse.json({ error: "Unknown image model" }, { status: 400 });
@@ -197,9 +237,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown video model" }, { status: 400 });
   }
 
-  // Whitelisted users: direct CometAPI call — no DB, no queue, no credits
+  const settingsWithImages = {
+    ...parsed.data.settings,
+    ...(referenceImages?.length && { referenceImages }),
+  };
+
+  // Whitelisted users: direct CometAPI call — no queue, no credits
   if (isWhitelistedEmail(session.user.email)) {
-    return directGenerate(type, modelId, prompt, parsed.data.settings);
+    return directGenerate(session.user.id, type, modelId, prompt, settingsWithImages);
   }
 
   // ── Normal pipeline: DB → credits → BullMQ queue ──
@@ -237,7 +282,7 @@ export async function POST(request: Request) {
       status: "queued",
       modelId,
       prompt,
-      settings: parsed.data.settings ?? null,
+      settings: settingsWithImages ?? null,
       queuePriority: TIER_PRIORITY[tier],
       creditCost,
     })

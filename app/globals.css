@@ -167,6 +167,15 @@ video {
   to   { opacity: 1; transform: translateY(0);    }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
 @keyframes shimmer {
   0%   { background-position: -250% center; }
   100% { background-position:  250% center; }

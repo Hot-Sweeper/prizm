@@ -88,7 +88,6 @@ export function QueueStatus({ jobId, onComplete }: QueueStatusProps) {
             className="text-brand-400"
             style={{ animation: "spin 1s linear infinite" }}
           />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <div>
             <p className="text-sm font-medium text-neutral-200">Processing</p>
             <p className="text-xs">Generating with AI...</p>

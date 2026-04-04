@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { GenerationForm } from "@/components/features/generation/generation-form";
-import type { DirectResult, ApiInfo } from "@/components/features/generation/generation-form";
+import type { DirectResult } from "@/components/features/generation/generation-form";
 import { QueueStatus } from "@/components/features/generation/queue-status";
 import { HistoryCard } from "@/components/features/generation/history-card";
 import { CreditDisplay } from "@/components/features/generation/credit-display";
@@ -45,33 +45,14 @@ export function GenerateClient({
   const [latestResultType, setLatestResultType] = useState<string | null>(null);
   const [history, setHistory] = useState<GenerationJob[]>(initialHistory);
 
-  function handleDirectResult(result: DirectResult) {
-    setLatestResultUrl(result.url);
-    setLatestResultType(result.type);
-    
-    const newJob: GenerationJob = {
-      id: crypto.randomUUID(), 
-      type: result.type,
-      status: "completed",
-      modelId: result.apiInfo.model,
-      prompt: "Direct Generation", 
-      resultUrl: result.url,
-      errorMessage: null,
-      creditCost: 0,
-      createdAt: new Date().toISOString(),
-      generationTimeMs: result.apiInfo.generationTimeMs,
-    };
-    setHistory((prev) => [newJob, ...prev]);
-  }
-
-  function handleJobCreated(jobId: string, prompt: string, type: string) {
+  function handleJobCreated(jobId: string, prompt: string, type: string, modelId?: string) {
     setActiveJobIds((prev) => [jobId, ...prev]);
     setLatestResultUrl(null);
     const newJob: GenerationJob = {
       id: jobId,
       type,
-      status: "pending",
-      modelId: null,
+      status: "queued",
+      modelId: modelId ?? null,
       prompt,
       resultUrl: null,
       errorMessage: null,
@@ -129,7 +110,7 @@ export function GenerateClient({
                 setLatestResultUrl(res.url);
                 setLatestResultType(res.type);
                 const newJob: GenerationJob = {
-                  id: crypto.randomUUID(),
+                  id: res.jobId ?? crypto.randomUUID(),
                   type: type,
                   status: "completed",
                   modelId: res.apiInfo.model,
@@ -159,22 +140,45 @@ export function GenerateClient({
         </div>
 
         <div className="model-picker-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "0.5rem 1.5rem 1.5rem 1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {activeJobIds.map(id => (
-            <div key={id} style={{ padding: "1rem", background: "rgba(124,58,237,0.1)", border: `1px solid ${VL}`, borderRadius: "1rem" }}>
-              <div style={{ fontSize: "0.75rem", color: VL, fontWeight: 700, letterSpacing: "0.05em", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <div style={{ width: "8px", height: "8px", background: VL, borderRadius: "50%", animation: "pulse 1.5s infinite" }} />
-                ACTIVE GENERATION
+          {activeJobIds.map(id => {
+            const jobInfo = history.find(j => j.id === id);
+            return (
+              <div key={id} style={{ padding: "1rem", background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: "1rem", position: "relative", overflow: "hidden" }}>
+                {/* Animated gradient shimmer */}
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, transparent 0%, rgba(124,58,237,0.06) 50%, transparent 100%)", backgroundSize: "200% 100%", animation: "shimmer 2s ease-in-out infinite", pointerEvents: "none" }} />
+                
+                <div style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
+                  {/* Throbber spinner */}
+                  <div style={{ flexShrink: 0, width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: "24px", height: "24px", border: "2.5px solid rgba(124,58,237,0.2)", borderTopColor: VL, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                  </div>
+                  
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                      <span style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.08em", color: VL, textTransform: "uppercase" }}>Queued</span>
+                      <div style={{ width: "6px", height: "6px", background: VL, borderRadius: "50%", animation: "pulse 1.5s ease-in-out infinite" }} />
+                    </div>
+                    {jobInfo && (
+                      <p style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {jobInfo.prompt}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                
+                <div style={{ position: "relative", marginTop: "0.75rem" }}>
+                  <QueueStatus 
+                    jobId={id} 
+                    onComplete={(url) => { 
+                      setActiveJobIds(prev => prev.filter(j => j !== id));
+                      setLatestResultUrl(url); 
+                      setHistory(prev => prev.map(j => j.id === id ? { ...j, status: "completed", resultUrl: url, updatedAt: new Date().toISOString() } : j));
+                    }} 
+                  />
+                </div>
               </div>
-              <QueueStatus 
-                jobId={id} 
-                onComplete={(url) => { 
-                  setActiveJobIds(prev => prev.filter(j => j !== id));
-                  setLatestResultUrl(url); 
-                  setHistory(prev => prev.map(j => j.id === id ? { ...j, status: "completed", resultUrl: url, updatedAt: new Date().toISOString() } : j));
-                }} 
-              />
-            </div>
-          ))}
+            );
+          })}
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {history.filter(job => !activeJobIds.includes(job.id)).map((job) => (
