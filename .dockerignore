@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+portrait-generator
+character-generator
+*.md
+.env*
+.titan
+.github

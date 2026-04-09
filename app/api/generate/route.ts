@@ -40,177 +40,163 @@ const TIER_MODEL_ACCESS: Record<
 };
 
 /**
- * Direct CometAPI call for whitelisted users — bypasses queue and R2 but persists to DB.
+ * Processes a generation job in the background (fire-and-forget).
+ * Updates the DB row when complete or failed.
  */
-async function directGenerate(
+function processDirectInBackground(
+  jobId: string,
   userId: string,
   type: "image" | "video",
   modelId: string,
   prompt: string,
   settings?: Record<string, unknown>
 ) {
-  const startTime = Date.now();
   const modelInfo = getModelInfo(modelId);
 
-  try {
-    let url: string;
-    let rawUsage: unknown = null;
+  const work = async () => {
+    try {
+      await db
+        .update(generationJobs)
+        .set({ status: "processing", updatedAt: new Date() })
+        .where(eq(generationJobs.id, jobId));
 
-    if (type === "image") {
-      if (modelInfo?.transport === "gemini-image") {
-        const response = await fetch(
-          `https://api.cometapi.com/v1beta/models/${modelId}:generateContent`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": process.env.COMETAPI_API_KEY ?? "",
-            },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-              generationConfig: {
-                responseModalities: ["IMAGE"],
-                imageConfig: { 
-                  aspectRatio: (settings?.aspectRatio as string) ?? "1:1", 
-                  imageSize: (settings?.resolution as string) ?? "1K" 
-                },
+      let url: string;
+
+      if (type === "image") {
+        if (modelInfo?.transport === "gemini-image") {
+          const response = await fetch(
+            `https://api.cometapi.com/v1beta/models/${modelId}:generateContent`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": process.env.COMETAPI_API_KEY ?? "",
               },
-            }),
-          }
-        );
+              body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: {
+                  responseModalities: ["IMAGE"],
+                  imageConfig: {
+                    aspectRatio: (settings?.aspectRatio as string) ?? "1:1",
+                    imageSize: (settings?.resolution as string) ?? "1K",
+                  },
+                },
+              }),
+            }
+          );
 
+          if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`Gemini image generation failed (${response.status}): ${errorBody}`);
+          }
+
+          const data = (await response.json()) as {
+            candidates?: Array<{
+              content?: {
+                parts?: Array<{
+                  inlineData?: { mimeType?: string; data?: string };
+                }>;
+              };
+            }>;
+          };
+
+          const parts = data.candidates?.[0]?.content?.parts ?? [];
+          const imagePart = parts.find((part) => part.inlineData?.data);
+          const inlineData = imagePart?.inlineData;
+
+          if (!inlineData?.data) {
+            throw new Error("Gemini returned no image data");
+          }
+
+          url = `data:${inlineData.mimeType ?? "image/png"};base64,${inlineData.data}`;
+        } else {
+          const response = await cometClient.images.generate({
+            model: modelId,
+            prompt,
+            n: 1,
+            size: "1024x1024",
+            response_format: "url",
+          });
+          const first = response.data?.[0];
+          if (!first?.url) throw new Error("CometAPI returned no image URL");
+          url = first.url;
+        }
+      } else {
+        const response = await fetch("https://api.cometapi.com/v1/videos/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.COMETAPI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: modelId,
+            prompt,
+            duration: 5,
+            aspect_ratio: (settings?.aspectRatio as string) ?? "16:9",
+          }),
+        });
         if (!response.ok) {
           const errorBody = await response.text();
-          throw new Error(`Gemini image generation failed (${response.status}): ${errorBody}`);
+          throw new Error(`Video generation failed (${response.status}): ${errorBody}`);
         }
-
-        const data = (await response.json()) as {
-          candidates?: Array<{
-            content?: {
-              parts?: Array<{
-                inlineData?: { mimeType?: string; data?: string };
-              }>;
-            };
-          }>;
-          usageMetadata?: unknown;
-        };
-
-        const parts = data.candidates?.[0]?.content?.parts ?? [];
-        const imagePart = parts.find((part) => part.inlineData?.data);
-        const inlineData = imagePart?.inlineData;
-
-        if (!inlineData?.data) {
-          throw new Error("Nano Banana returned no image data");
-        }
-
-        url = `data:${inlineData.mimeType ?? "image/png"};base64,${inlineData.data}`;
-        rawUsage = data.usageMetadata ?? null;
-      } else {
-        const response = await cometClient.images.generate({
-          model: modelId,
-          prompt,
-          n: 1,
-          size: "1024x1024",
-          response_format: "url",
-        });
-        const first = response.data?.[0];
-        if (!first?.url) throw new Error("CometAPI returned no image URL");
-        url = first.url;
-        rawUsage = (response as unknown as Record<string, unknown>).usage ?? null;
+        const data = (await response.json()) as Record<string, unknown>;
+        url = data.url as string;
+        if (!url) throw new Error("CometAPI returned no video URL");
       }
-    } else {
-      const response = await fetch("https://api.cometapi.com/v1/videos/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.COMETAPI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: modelId,
-          prompt,
-          duration: 5,
-          aspect_ratio: (settings?.aspectRatio as string) ?? "16:9",
-        }),
-      });
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`Video generation failed (${response.status}): ${errorBody}`);
-      }
-      const data = (await response.json()) as Record<string, unknown>;
-      url = data.url as string;
-      rawUsage = data.usage ?? null;
-      if (!url) throw new Error("CometAPI returned no video URL");
+
+      await db
+        .update(generationJobs)
+        .set({ status: "completed", resultUrl: url, updatedAt: new Date() })
+        .where(eq(generationJobs.id, jobId));
+
+      console.log(`[direct] Job ${jobId} completed`);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Generation failed";
+      console.error(`[direct] Job ${jobId} failed:`, errorMsg);
+      await db
+        .update(generationJobs)
+        .set({ status: "failed", errorMessage: errorMsg, updatedAt: new Date() })
+        .where(eq(generationJobs.id, jobId))
+        .catch(() => {});
     }
+  };
 
-    const generationTimeMs = Date.now() - startTime;
+  work().catch(() => {});
+}
 
-    const [savedJob] = await db
-      .insert(generationJobs)
-      .values({
-        userId,
-        type,
-        status: "completed",
-        modelId,
-        prompt,
-        settings: settings ?? null,
-        queuePriority: 0,
-        creditCost: 0,
-        resultUrl: url,
-        updatedAt: new Date(),
-      })
-      .returning({ id: generationJobs.id });
-
-    return NextResponse.json({
-      jobId: savedJob?.id ?? null,
-      status: "completed",
-      url,
+/**
+ * Enqueues a direct generation for whitelisted users — creates a DB job and
+ * processes in the background so the API responds instantly.
+ */
+async function directGenerate(
+  userId: string,
+  type: "image" | "video",
+  modelId: string,
+  prompt: string,
+  dbSettings: Record<string, unknown> | null,
+  runtimeSettings?: Record<string, unknown>
+) {
+  const [newJob] = await db
+    .insert(generationJobs)
+    .values({
+      userId,
       type,
-      apiInfo: {
-        model: modelId,
-        modelName: modelInfo?.displayName ?? modelId,
-        provider: modelInfo?.provider ?? "Unknown",
-        generationTimeMs,
-        estimatedCostUSD: modelInfo?.estimatedCostUSD ?? null,
-        pricingLabel: modelInfo?.pricingLabel,
-        usage: rawUsage,
-      },
-    });
-  } catch (err) {
-    const generationTimeMs = Date.now() - startTime;
-    const errorMsg = err instanceof Error ? err.message : "Generation failed";
+      status: "queued",
+      modelId,
+      prompt,
+      settings: dbSettings,
+      queuePriority: 0,
+      creditCost: 0,
+    })
+    .returning({ id: generationJobs.id });
 
-    await db
-      .insert(generationJobs)
-      .values({
-        userId,
-        type,
-        status: "failed",
-        modelId,
-        prompt,
-        settings: settings ?? null,
-        queuePriority: 0,
-        creditCost: 0,
-        errorMessage: errorMsg,
-        updatedAt: new Date(),
-      })
-      .catch(() => {});
-
-    return NextResponse.json(
-      {
-        status: "failed",
-        error: errorMsg,
-        apiInfo: {
-          model: modelId,
-          modelName: modelInfo?.displayName ?? modelId,
-          provider: modelInfo?.provider ?? "Unknown",
-          generationTimeMs,
-          estimatedCostUSD: modelInfo?.estimatedCostUSD ?? null,
-          pricingLabel: modelInfo?.pricingLabel,
-        },
-      },
-      { status: 500 }
-    );
+  if (!newJob) {
+    return NextResponse.json({ error: "Failed to create job" }, { status: 500 });
   }
+
+  processDirectInBackground(newJob.id, userId, type, modelId, prompt, runtimeSettings);
+
+  return NextResponse.json({ jobId: newJob.id, status: "queued" }, { status: 201 });
 }
 
 export async function POST(request: Request) {
@@ -237,14 +223,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown video model" }, { status: 400 });
   }
 
-  const settingsWithImages = {
+  // Keep base64 reference images OUT of db-persisted settings to avoid multi-MB JSONB rows
+  const dbSettings = parsed.data.settings ?? null;
+  const runtimeSettings = {
     ...parsed.data.settings,
     ...(referenceImages?.length && { referenceImages }),
   };
 
   // Whitelisted users: direct CometAPI call — no queue, no credits
   if (isWhitelistedEmail(session.user.email)) {
-    return directGenerate(session.user.id, type, modelId, prompt, settingsWithImages);
+    try {
+      return await directGenerate(session.user.id, type, modelId, prompt, dbSettings, runtimeSettings);
+    } catch (err) {
+      console.error("[generate] directGenerate failed:", err instanceof Error ? err.message : err);
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Generation failed" },
+        { status: 500 }
+      );
+    }
   }
 
   // ── Normal pipeline: DB → credits → BullMQ queue ──
@@ -282,7 +278,7 @@ export async function POST(request: Request) {
       status: "queued",
       modelId,
       prompt,
-      settings: settingsWithImages ?? null,
+      settings: dbSettings,
       queuePriority: TIER_PRIORITY[tier],
       creditCost,
     })
