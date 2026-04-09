@@ -32,7 +32,7 @@ interface GenerationFormProps {
   imageBalance: number;
   videoBalance: number;
   isWhitelisted?: boolean;
-  onJobCreated: (jobId: string, prompt: string, type: string) => void;
+  onJobCreated: (jobId: string, prompt: string, type: string, modelId: string) => void;
   onDirectResult?: (result: DirectResult, prompt: string, type: string) => void;
 }
 
@@ -230,7 +230,7 @@ export function GenerationForm({
       }
 
       // Queued generation: normal pipeline
-      onJobCreated(data.jobId as string, prompt.trim(), type);
+      onJobCreated(data.jobId as string, prompt.trim(), type, modelId);
       setPrompt("");
       clearAttachedImages();
     } catch {

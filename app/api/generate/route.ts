@@ -64,6 +64,16 @@ function processDirectInBackground(
 
       if (type === "image") {
         if (modelInfo?.transport === "gemini-image") {
+          // Build parts: reference images first (if any), then the text prompt
+          const referenceImages = (settings?.referenceImages as string[] | undefined) ?? [];
+          const imageParts = referenceImages
+            .map((dataUrl) => {
+              const match = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(dataUrl);
+              if (!match) return null;
+              return { inlineData: { mimeType: match[1], data: match[2] } };
+            })
+            .filter(Boolean);
+
           const response = await fetch(
             `https://api.cometapi.com/v1beta/models/${modelId}:generateContent`,
             {
@@ -73,7 +83,7 @@ function processDirectInBackground(
                 "x-goog-api-key": process.env.COMETAPI_API_KEY ?? "",
               },
               body: JSON.stringify({
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                contents: [{ role: "user", parts: [...imageParts, { text: prompt }] }],
                 generationConfig: {
                   responseModalities: ["IMAGE"],
                   imageConfig: {

@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { CheckCircle, XCircle, Clock, Spinner as Loader2 } from "@phosphor-icons/react/dist/ssr";
-import Image from "next/image";
+import { XCircle, Clock, Spinner as Loader2 } from "@phosphor-icons/react/dist/ssr";
 
 type JobStatus = "queued" | "processing" | "completed" | "failed";
 
@@ -61,7 +60,7 @@ export function QueueStatus({ jobId, onComplete }: QueueStatusProps) {
   }, [poll]);
 
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
+    <div>
       {/* Screen reader live region for status changes */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {jobState.status === "queued" && "Your generation is queued"}
@@ -71,73 +70,31 @@ export function QueueStatus({ jobId, onComplete }: QueueStatusProps) {
       </div>
 
       {jobState.status === "queued" && (
-        <div className="flex items-center gap-3 text-neutral-400">
-          <Clock size={18} aria-hidden="true" className="text-amber-400" />
-          <div>
-            <p className="text-sm font-medium text-neutral-200">Queued</p>
-            <p className="text-xs">Waiting for an available worker...</p>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <Clock size={13} aria-hidden="true" style={{ color: "#f59e0b", flexShrink: 0 }} />
+          <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.5)" }}>Waiting in queue…</span>
         </div>
       )}
 
       {jobState.status === "processing" && (
-        <div className="flex items-center gap-3 text-neutral-400">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <Loader2
-            size={18}
+            size={13}
             aria-hidden="true"
-            className="text-brand-400"
-            style={{ animation: "spin 1s linear infinite" }}
+            style={{ color: "var(--color-secondary)", flexShrink: 0, animation: "spin 1s linear infinite" }}
           />
-          <div>
-            <p className="text-sm font-medium text-neutral-200">Processing</p>
-            <p className="text-xs">Generating with AI...</p>
-          </div>
+          <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.5)" }}>Generating with AI…</span>
         </div>
       )}
 
-      {jobState.status === "completed" && jobState.resultUrl && (
-        <div>
-          <div className="mb-3 flex items-center gap-2 text-green-400">
-            <CheckCircle size={16} aria-hidden="true" />
-            <span className="text-sm font-medium">Complete</span>
-          </div>
-          {jobState.type === "image" ? (
-            <div className="relative aspect-square w-full overflow-hidden rounded-lg">
-              <Image
-                src={jobState.resultUrl}
-                alt={jobState.prompt ?? "Generated image"}
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 100vw, 50vw"
-              />
-            </div>
-          ) : (
-            <video
-              src={jobState.resultUrl}
-              controls
-              className="w-full rounded-lg"
-              aria-label={`Generated video: ${jobState.prompt ?? ""}`}
-            />
-          )}
-          <a
-            href={jobState.resultUrl}
-            download
-            className="mt-3 inline-flex items-center gap-1 text-xs text-brand-400 hover:underline"
-          >
-            Download
-          </a>
-        </div>
-      )}
+      {jobState.status === "completed" && jobState.resultUrl && null /* parent removes card on complete */}
 
       {jobState.status === "failed" && (
-        <div className="flex items-start gap-3 text-red-400">
-          <XCircle size={18} aria-hidden="true" className="mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-medium">Generation failed</p>
-            <p className="text-xs text-neutral-500">
-              {jobState.errorMessage ?? "An unknown error occurred"}
-            </p>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <XCircle size={13} aria-hidden="true" style={{ color: "#ef4444", flexShrink: 0 }} />
+          <span style={{ fontSize: "0.72rem", color: "#ef4444" }}>
+            {jobState.errorMessage ?? "Generation failed"}
+          </span>
         </div>
       )}
     </div>

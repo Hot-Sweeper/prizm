@@ -6,7 +6,9 @@ import type { DirectResult } from "@/components/features/generation/generation-f
 import { QueueStatus } from "@/components/features/generation/queue-status";
 import { HistoryCard } from "@/components/features/generation/history-card";
 import { CreditDisplay } from "@/components/features/generation/credit-display";
-import { Sparkle as Sparkles, Timer, CurrencyDollar, Cpu, Lightning, Clock } from "@phosphor-icons/react/dist/ssr";
+import { Sparkle as Sparkles, Timer, CurrencyDollar, Cpu, Lightning, Clock, Image as ImageIcon, FilmSlate } from "@phosphor-icons/react/dist/ssr";
+import { getModelInfo } from "@/lib/ai/models";
+import { ModelBrandIcon } from "@/components/features/generation/model-brand-icon";
 import Image from "next/image";
 
 interface GenerationJob {
@@ -45,7 +47,7 @@ export function GenerateClient({
   const [latestResultType, setLatestResultType] = useState<string | null>(null);
   const [history, setHistory] = useState<GenerationJob[]>(initialHistory);
 
-  function handleJobCreated(jobId: string, prompt: string, type: string, modelId?: string) {
+  function handleJobCreated(jobId: string, prompt: string, type: string, modelId: string) {
     setActiveJobIds((prev) => [jobId, ...prev]);
     setLatestResultUrl(null);
     const newJob: GenerationJob = {
@@ -105,7 +107,7 @@ export function GenerateClient({
               imageBalance={imageBalance}
               videoBalance={videoBalance}
               isWhitelisted={isWhitelisted}
-              onJobCreated={(jobId, prompt, type) => handleJobCreated(jobId, prompt, type)}
+              onJobCreated={(jobId, prompt, type, modelId) => handleJobCreated(jobId, prompt, type, modelId)}
               onDirectResult={(res, prompt, type) => {
                 setLatestResultUrl(res.url);
                 setLatestResultType(res.type);
@@ -142,38 +144,42 @@ export function GenerateClient({
         <div className="model-picker-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "0.5rem 1.5rem 1.5rem 1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
           {activeJobIds.map(id => {
             const jobInfo = history.find(j => j.id === id);
+            const modelInfo = jobInfo?.modelId ? getModelInfo(jobInfo.modelId) : null;
+            const isVideo = jobInfo?.type === "video";
             return (
-              <div key={id} style={{ padding: "1rem", background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: "1rem", position: "relative", overflow: "hidden" }}>
-                {/* Animated gradient shimmer */}
-                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, transparent 0%, rgba(124,58,237,0.06) 50%, transparent 100%)", backgroundSize: "200% 100%", animation: "shimmer 2s ease-in-out infinite", pointerEvents: "none" }} />
-                
-                <div style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
-                  {/* Throbber spinner */}
-                  <div style={{ flexShrink: 0, width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: "24px", height: "24px", border: "2.5px solid rgba(124,58,237,0.2)", borderTopColor: VL, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  </div>
-                  
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
-                      <span style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.08em", color: VL, textTransform: "uppercase" }}>Queued</span>
-                      <div style={{ width: "6px", height: "6px", background: VL, borderRadius: "50%", animation: "pulse 1.5s ease-in-out infinite" }} />
-                    </div>
-                    {jobInfo && (
-                      <p style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {jobInfo.prompt}
-                      </p>
-                    )}
-                  </div>
+              <div key={id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: "0.875rem", overflow: "hidden" }}>
+                {/* Header row: model + type badge */}
+                <div style={{ padding: "0.75rem 0.875rem", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  {modelInfo && (
+                    <ModelBrandIcon model={modelInfo} active={false} />
+                  )}
+                  <span style={{ flex: 1, fontSize: "0.75rem", fontWeight: 600, color: "rgba(255,255,255,0.85)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {modelInfo?.displayName ?? "Generating..."}
+                  </span>
+                  <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: "0.25rem", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: isVideo ? "#f59e0b" : VL, background: isVideo ? "rgba(245,158,11,0.1)" : "rgba(124,58,237,0.15)", borderRadius: "999px", padding: "2px 8px" }}>
+                    {isVideo ? <FilmSlate size={10} aria-hidden /> : <ImageIcon size={10} aria-hidden />}
+                    {isVideo ? "Video" : "Image"}
+                  </span>
                 </div>
-                
-                <div style={{ position: "relative", marginTop: "0.75rem" }}>
-                  <QueueStatus 
-                    jobId={id} 
-                    onComplete={(url) => { 
+
+                {/* Prompt */}
+                {jobInfo && (
+                  <div style={{ padding: "0.625rem 0.875rem 0 0.875rem" }}>
+                    <p style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      {jobInfo.prompt}
+                    </p>
+                  </div>
+                )}
+
+                {/* Status strip */}
+                <div style={{ padding: "0.5rem 0.875rem 0.75rem 0.875rem" }}>
+                  <QueueStatus
+                    jobId={id}
+                    onComplete={(url) => {
                       setActiveJobIds(prev => prev.filter(j => j !== id));
-                      setLatestResultUrl(url); 
+                      setLatestResultUrl(url);
                       setHistory(prev => prev.map(j => j.id === id ? { ...j, status: "completed", resultUrl: url, updatedAt: new Date().toISOString() } : j));
-                    }} 
+                    }}
                   />
                 </div>
               </div>
