@@ -237,7 +237,7 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error("[generate] directGenerate failed:", err instanceof Error ? err.message : err);
       return NextResponse.json(
-        { error: err instanceof Error ? err.message : "Generation failed" },
+        { error: "Generation failed. Please try again later." },
         { status: 500 }
       );
     }
