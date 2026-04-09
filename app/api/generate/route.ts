@@ -74,6 +74,19 @@ function processDirectInBackground(
             })
             .filter(Boolean);
 
+          const requestBody = JSON.stringify({
+            contents: [{ role: "user", parts: [...imageParts, { text: prompt }] }],
+            generationConfig: {
+              responseModalities: ["IMAGE"],
+              imageConfig: {
+                aspectRatio: (settings?.aspectRatio as string) ?? "1:1",
+                imageSize: (settings?.resolution as string) ?? "1K",
+              },
+            },
+          });
+
+          console.log(`[direct] Job ${jobId}: Gemini request — ${imageParts.length} ref images, body size ${(requestBody.length / 1024).toFixed(0)}KB`);
+
           const response = await fetch(
             `https://api.cometapi.com/v1beta/models/${modelId}:generateContent`,
             {
@@ -82,16 +95,7 @@ function processDirectInBackground(
                 "Content-Type": "application/json",
                 "x-goog-api-key": process.env.COMETAPI_API_KEY ?? "",
               },
-              body: JSON.stringify({
-                contents: [{ role: "user", parts: [...imageParts, { text: prompt }] }],
-                generationConfig: {
-                  responseModalities: ["IMAGE"],
-                  imageConfig: {
-                    aspectRatio: (settings?.aspectRatio as string) ?? "1:1",
-                    imageSize: (settings?.resolution as string) ?? "1K",
-                  },
-                },
-              }),
+              body: requestBody,
             }
           );
 
@@ -161,11 +165,13 @@ function processDirectInBackground(
 
       console.log(`[direct] Job ${jobId} completed`);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Generation failed";
+      const rawMsg = err instanceof Error ? err.message : String(err);
+      const cause = err instanceof Error && err.cause ? ` | cause: ${JSON.stringify(err.cause)}` : "";
+      const errorMsg = `${rawMsg}${cause}`;
       console.error(`[direct] Job ${jobId} failed:`, errorMsg);
       await db
         .update(generationJobs)
-        .set({ status: "failed", errorMessage: errorMsg, updatedAt: new Date() })
+        .set({ status: "failed", errorMessage: rawMsg.slice(0, 500), updatedAt: new Date() })
         .where(eq(generationJobs.id, jobId))
         .catch(() => {});
     }
