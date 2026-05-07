@@ -8,9 +8,10 @@ import { BillingPageClient } from "../billing/billing-page-client";
 type DashboardTab = "studio" | "gallery" | "billing";
 
 function parseHashToTab(hash: string): DashboardTab {
-  const normalized = hash.replace(/^#/, "").toLowerCase();
-  if (normalized === "gallery") return "gallery";
-  if (normalized === "billing") return "billing";
+  const raw = hash.replace(/^#/, "");
+  const firstSegment = raw.split("#")[0]?.toLowerCase();
+  if (firstSegment === "gallery") return "gallery";
+  if (firstSegment === "billing") return "billing";
   return "studio";
 }
 
