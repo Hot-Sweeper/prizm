@@ -1,9 +1,14 @@
 export interface ModelInfo {
+  id?: string;
   displayName: string;
   provider: string;
   familyKey:
     | "openai"
     | "google"
+    | "doubao"
+    | "replicate"
+    | "bria"
+    | "qwen"
     | "xai"
     | "flux"
     | "ideogram"
@@ -21,6 +26,125 @@ export interface ModelInfo {
   pricingLabel: string;
   transport?: "openai-image" | "gemini-image" | "video-generate";
   directOnly?: boolean;
+  iconUrl?: string;
+  brandIconUrl?: string;
+}
+
+const THE_SVG_CDN_BASE = "https://cdn.jsdelivr.net/gh/glincker/thesvg@main/public/icons";
+
+const PROVIDER_ICON_SLUGS: Record<string, string> = {
+  openai: "openai",
+  google: "google",
+  doubao: "doubao",
+  flux: "flux",
+  runway: "runway",
+  kling: "kling",
+  minimax: "minimax",
+  replicate: "replicate",
+};
+
+function titleCaseSegment(segment: string) {
+  if (!segment) return "";
+  if (/^[a-z]\d/i.test(segment) || /^\d/.test(segment)) return segment.toUpperCase();
+  return segment.charAt(0).toUpperCase() + segment.slice(1);
+}
+
+function humanizeModelId(modelId: string) {
+  return modelId
+    .replace(/[._]/g, "-")
+    .split("/")
+    .flatMap((part) => part.split("-"))
+    .filter(Boolean)
+    .map(titleCaseSegment)
+    .join(" ");
+}
+
+export function inferProvider(modelId: string): string {
+  const normalized = modelId.toLowerCase();
+
+  if (normalized.includes("gemini") || normalized.startsWith("veo")) return "Google";
+  if (normalized.startsWith("gpt") || normalized.startsWith("dall-e") || normalized.startsWith("sora")) return "OpenAI";
+  if (normalized.includes("seedance") || normalized.includes("seedream") || normalized.startsWith("doubao")) return "Doubao";
+  if (normalized.includes("kling")) return "Kling";
+  if (normalized.includes("runway")) return "Runway";
+  if (normalized.includes("flux")) return normalized.includes("black-forest-labs") ? "Replicate" : "Flux";
+  if (normalized.includes("recraft")) return "Replicate";
+  if (normalized.includes("ideogram")) return "Replicate";
+  if (normalized.includes("stable-diffusion") || normalized.includes("stability")) return "Replicate";
+  if (normalized.includes("minimax")) return "MiniMax";
+  if (normalized.includes("qwen")) return "Aliyun";
+  if (normalized.includes("bria")) return "Bria";
+  if (normalized.includes("luma")) return "Luma";
+  if (normalized.includes("wan")) return "Wan";
+
+  return "CometAPI";
+}
+
+export function inferFamilyKey(modelId: string): ModelInfo["familyKey"] {
+  const normalized = modelId.toLowerCase();
+
+  if (normalized.includes("gemini") || normalized.startsWith("veo")) return "google";
+  if (normalized.startsWith("gpt") || normalized.startsWith("dall-e") || normalized.startsWith("sora")) return "openai";
+  if (normalized.includes("seedance") || normalized.includes("seedream") || normalized.startsWith("doubao")) return "doubao";
+  if (normalized.includes("kling")) return "kling";
+  if (normalized.includes("runway")) return "runway";
+  if (normalized.includes("flux")) return normalized.includes("black-forest-labs") ? "replicate" : "flux";
+  if (normalized.includes("recraft")) return "recraft";
+  if (normalized.includes("ideogram")) return "ideogram";
+  if (normalized.includes("stable-diffusion") || normalized.includes("stability")) return "stability";
+  if (normalized.includes("minimax")) return "minimax";
+  if (normalized.includes("qwen")) return "qwen";
+  if (normalized.includes("bria")) return "bria";
+  if (normalized.includes("luma")) return "luma";
+  if (normalized.includes("wan")) return "wan";
+
+  return "openai";
+}
+
+export function inferTransport(modelId: string, typeHint?: "image" | "video"): ModelInfo["transport"] {
+  const normalized = modelId.toLowerCase();
+
+  if (normalized.includes("gemini") && (typeHint === "image" || normalized.includes("image"))) {
+    return "gemini-image";
+  }
+
+  if (typeHint === "video" || normalized.startsWith("sora") || normalized.startsWith("veo") || normalized.includes("seedance") || normalized.includes("kling") || normalized.includes("runway")) {
+    return "video-generate";
+  }
+
+  return "openai-image";
+}
+
+export function getBrandIconUrl(providerOrCode: string) {
+  const normalized = providerOrCode.toLowerCase().replace(/\s+/g, "-");
+  const slug = PROVIDER_ICON_SLUGS[normalized];
+  return slug ? `${THE_SVG_CDN_BASE}/${slug}/default.svg` : null;
+}
+
+function inferModelInfo(modelId: string): ModelInfo {
+  const provider = inferProvider(modelId);
+  const familyKey = inferFamilyKey(modelId);
+  const isVideo = modelId.toLowerCase().startsWith("sora") || modelId.toLowerCase().startsWith("veo") || modelId.toLowerCase().includes("seedance") || modelId.toLowerCase().includes("video");
+  const estimatedCostUSD = isVideo ? 0.25 : 0.04;
+  const creditCost = isVideo ? 5 : 2;
+  const minTier = isVideo ? "pro" : "free";
+  const transport = inferTransport(modelId, isVideo ? "video" : "image");
+  const brandIconUrl = getBrandIconUrl(provider) ?? getBrandIconUrl(familyKey);
+
+  return {
+    id: modelId,
+    displayName: humanizeModelId(modelId),
+    provider,
+    familyKey,
+    creditCost,
+    minTier,
+    description: `${provider} model available through CometAPI.`,
+    estimatedCostUSD,
+    pricingLabel: estimatedCostUSD ? `Est. $${estimatedCostUSD.toFixed(3)} / req` : "Live pricing",
+    transport,
+    brandIconUrl: brandIconUrl ?? undefined,
+    iconUrl: brandIconUrl ?? undefined,
+  };
 }
 
 export const IMAGE_MODELS: Record<string, ModelInfo> = {
@@ -101,7 +225,18 @@ export function getModelCreditCost(modelId: string): number {
 }
 
 export function getModelInfo(modelId: string): ModelInfo | null {
-  return IMAGE_MODELS[modelId] ?? VIDEO_MODELS[modelId] ?? null;
+  const staticInfo = IMAGE_MODELS[modelId] ?? VIDEO_MODELS[modelId];
+  if (staticInfo) {
+    const providerIcon = getBrandIconUrl(staticInfo.provider) ?? getBrandIconUrl(staticInfo.familyKey);
+    return {
+      ...staticInfo,
+      id: modelId,
+      brandIconUrl: staticInfo.brandIconUrl ?? providerIcon ?? undefined,
+      iconUrl: staticInfo.iconUrl ?? staticInfo.brandIconUrl ?? providerIcon ?? undefined,
+    };
+  }
+
+  return inferModelInfo(modelId);
 }
 
 function buildProviderGroups(models: Record<string, ModelInfo>) {

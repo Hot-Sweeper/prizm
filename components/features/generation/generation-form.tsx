@@ -3,9 +3,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Image as ImageIcon, VideoCamera as VideoIcon, MagicWand as Wand2, Paperclip, X as XIcon } from "@phosphor-icons/react/dist/ssr";
 import { ModelPicker } from "./model-picker";
-import { AspectRatioPicker } from "./aspect-ratio-picker";
-import { ResolutionPicker } from "./resolution-picker";
-import { getModelCreditCost, getModelInfo } from "@/lib/ai/models";
+import { getModelCreditCost, type ModelInfo } from "@/lib/ai/models";
+import type { ModelCapabilityProfile } from "@/lib/ai/model-capabilities";
+import { buildDefaultSettings } from "@/lib/ai/model-capabilities";
+import { DynamicModelSettings } from "./dynamic-model-settings";
 import { Spinner } from "@/components/ui/spinner";
 import TextareaAutosize from "react-textarea-autosize";
 import NextImage from "next/image";
@@ -38,6 +39,28 @@ interface GenerationFormProps {
 
 type GenerationType = "image" | "video";
 
+interface LiveCatalogModel {
+  id: string;
+  displayName: string;
+  provider: string;
+  familyKey: ModelInfo["familyKey"];
+  creditCost: number;
+  minTier: "free" | "pro" | "max";
+  description: string;
+  estimatedCostUSD: number;
+  pricingLabel: string;
+  transport?: "openai-image" | "gemini-image" | "video-generate";
+  iconUrl?: string;
+  brandIconUrl?: string;
+  capabilityProfile: ModelCapabilityProfile;
+  settingsDefaults: Record<string, unknown>;
+}
+
+interface CatalogResponse {
+  imageModels: LiveCatalogModel[];
+  videoModels: LiveCatalogModel[];
+}
+
 interface AttachedImage {
   id: string;
   file: File;
@@ -47,11 +70,6 @@ interface AttachedImage {
 const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const MAX_IMAGE_SIZE_MB = 10;
 const MAX_IMAGES = 5;
-
-const DEFAULT_MODELS: Record<GenerationType, string> = {
-  image: "dall-e-3",
-  video: "kling_video",
-};
 
 const MAX_PROMPT_LENGTH = 500;
 const GENERATE_REQUEST_TIMEOUT_MS = 15000;
@@ -72,9 +90,9 @@ export function GenerationForm({
 }: GenerationFormProps) {
   const [type, setType] = useState<GenerationType>("image");
   const [prompt, setPrompt] = useState("");
-  const [modelId, setModelId] = useState(DEFAULT_MODELS.image);
-  const [aspectRatio, setAspectRatio] = useState("16:9");
-  const [resolution, setResolution] = useState("2K");
+  const [modelId, setModelId] = useState("");
+  const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
+  const [settings, setSettings] = useState<Record<string, unknown>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
@@ -82,13 +100,73 @@ export function GenerationForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
 
-
-  const creditCost = modelId ? getModelCreditCost(modelId) : 0;
-  const selectedModel = modelId ? getModelInfo(modelId) : null;
+  const availableModels = type === "image" ? (catalog?.imageModels ?? []) : (catalog?.videoModels ?? []);
+  const selectedCatalogModel = availableModels.find((model) => model.id === modelId) ?? null;
+  const activeProfile = selectedCatalogModel?.capabilityProfile ?? null;
+  const supportsReferenceImages = activeProfile?.supportsReferenceImages ?? true;
+  const creditCost = selectedCatalogModel?.creditCost ?? (modelId ? getModelCreditCost(modelId) : 0);
   const balance = type === "image" ? imageBalance : videoBalance;
   const canAfford = balance >= creditCost;
   const promptValid = prompt.trim().length >= 3;
-  const canSubmit = canAfford && promptValid && !isSubmitting;
+  const canSubmit = canAfford && promptValid && !isSubmitting && Boolean(modelId);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCatalog() {
+      try {
+        const response = await fetch("/api/models/catalog", {
+          cache: "no-store",
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json()) as CatalogResponse;
+        if (!cancelled) {
+          setCatalog(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setCatalog({ imageModels: [], videoModels: [] });
+        }
+      }
+    }
+
+    void loadCatalog();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (availableModels.length === 0) return;
+
+    const currentModel = availableModels.find((model) => model.id === modelId);
+    if (currentModel) return;
+
+    const nextModel = availableModels[0];
+    if (!nextModel) return;
+    setModelId(nextModel.id);
+    setSettings(nextModel.settingsDefaults ?? buildDefaultSettings(nextModel.capabilityProfile));
+  }, [availableModels, modelId]);
+
+  useEffect(() => {
+    if (!selectedCatalogModel) return;
+
+    setSettings((previous) => {
+      const defaults = selectedCatalogModel.settingsDefaults ?? buildDefaultSettings(selectedCatalogModel.capabilityProfile);
+      return { ...defaults, ...previous };
+    });
+  }, [selectedCatalogModel?.id]);
+
+  useEffect(() => {
+    if (supportsReferenceImages || attachedImages.length === 0) return;
+    clearAttachedImages();
+  }, [attachedImages.length, supportsReferenceImages]);
 
   const addImages = useCallback((files: File[]) => {
     const validFiles = files.filter((f) => {
@@ -183,8 +261,24 @@ export function GenerationForm({
   function handleTypeChange(newType: GenerationType) {
     if (newType === type) return;
     setType(newType);
-    setModelId(DEFAULT_MODELS[newType]);
+    setModelId("");
+    setSettings({});
     setError(null);
+  }
+
+  function handleModelChange(nextModelId: string) {
+    const nextModel = availableModels.find((model) => model.id === nextModelId);
+    setModelId(nextModelId);
+    if (nextModel) {
+      setSettings(nextModel.settingsDefaults ?? buildDefaultSettings(nextModel.capabilityProfile));
+    }
+  }
+
+  function handleSettingChange(key: string, value: string | number | boolean) {
+    setSettings((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
   }
 
   async function handleSubmit(e?: React.FormEvent) {
@@ -219,7 +313,7 @@ export function GenerationForm({
           prompt: prompt.trim(),
           modelId,
           type,
-          settings: { aspectRatio, resolution },
+          settings,
           ...(imageData && { referenceImages: imageData }),
         }),
       });
@@ -476,17 +570,28 @@ export function GenerationForm({
         </div>
       )}
 
+      <DynamicModelSettings
+        profile={activeProfile}
+        settings={settings}
+        onChange={handleSettingChange}
+      />
+
       {/* Bottom Tool Strip */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", position: "relative", flexWrap: "wrap" }}>
         
         {/* Left Toolbar */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           {/* Upload button */}
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              if (supportsReferenceImages) {
+                fileInputRef.current?.click();
+              }
+            }}
             aria-label="Upload reference images"
-            title="Upload images"
+            title={supportsReferenceImages ? "Upload images" : "This model does not support reference images"}
+            disabled={!supportsReferenceImages}
             style={{
               display: "flex",
               alignItems: "center",
@@ -497,7 +602,8 @@ export function GenerationForm({
               border: "1px solid rgba(255,255,255,0.1)",
               background: attachedImages.length > 0 ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.04)",
               color: attachedImages.length > 0 ? VL : "rgba(255,255,255,0.45)",
-              cursor: "pointer",
+              cursor: supportsReferenceImages ? "pointer" : "not-allowed",
+              opacity: supportsReferenceImages ? 1 : 0.45,
               transition: "all 0.15s",
               padding: 0,
               position: "relative",
@@ -566,29 +672,14 @@ export function GenerationForm({
             ))}
           </div>
 
-          {/* Settings Pickers */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <div style={{ minWidth: "240px" }}>
             <ModelPicker
-              type={type}
+              models={availableModels}
               value={modelId}
-              onChange={setModelId}
+              onChange={handleModelChange}
               userTier={userTier}
               isWhitelisted={isWhitelisted}
             />
-            {type === "image" && (
-              <>
-                <AspectRatioPicker
-                  value={aspectRatio}
-                  onChange={setAspectRatio}
-                />
-                {(modelId.includes("nano") || modelId.includes("banana") || modelId.includes("gemini")) && (
-                  <ResolutionPicker
-                    value={resolution}
-                    onChange={setResolution}
-                  />
-                )}
-              </>
-            )}
           </div>
         </div>
 

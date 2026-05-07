@@ -86,6 +86,8 @@ function BrandGlyph({ familyKey }: { familyKey: ModelInfo["familyKey"] }) {
 }
 
 export function ModelBrandIcon({ model, active = false }: ModelBrandIconProps) {
+  const iconUrl = model.iconUrl ?? model.brandIconUrl;
+
   return (
     <span
       aria-hidden
@@ -102,7 +104,17 @@ export function ModelBrandIcon({ model, active = false }: ModelBrandIconProps) {
         flexShrink: 0,
       }}
     >
-      <BrandGlyph familyKey={model.familyKey} />
+      {iconUrl ? (
+        <img
+          src={iconUrl}
+          alt=""
+          width={14}
+          height={14}
+          style={{ width: "14px", height: "14px", objectFit: "contain" }}
+        />
+      ) : (
+        <BrandGlyph familyKey={model.familyKey} />
+      )}
     </span>
   );
 }

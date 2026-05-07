@@ -5,14 +5,8 @@ import { deductCredits } from "@/lib/credits";
 import { isWhitelistedEmail } from "@/lib/credits/whitelist";
 import { enqueueGeneration } from "@/lib/queue/enqueue";
 import { cometClient } from "@/lib/ai/comet-client";
-import {
-  IMAGE_MODELS,
-  VIDEO_MODELS,
-  getModelCreditCost,
-  getModelInfo,
-  isImageModel,
-  isVideoModel,
-} from "@/lib/ai/models";
+import { getModelInfo } from "@/lib/ai/models";
+import { getLiveModelById } from "@/lib/ai/live-model-catalog";
 import { getSubscriptionByUserId } from "@/lib/stripe/subscription";
 import { TIER_PRIORITY } from "@/lib/queue/job-types";
 import { NextResponse } from "next/server";
@@ -55,6 +49,9 @@ function processDirectInBackground(
 
   const work = async () => {
     try {
+      const liveModel = await getLiveModelById(modelId);
+      const resolvedModelInfo = liveModel ?? modelInfo;
+
       await db
         .update(generationJobs)
         .set({ status: "processing", updatedAt: new Date() })
@@ -63,7 +60,7 @@ function processDirectInBackground(
       let url: string;
 
       if (type === "image") {
-        if (modelInfo?.transport === "gemini-image") {
+        if (resolvedModelInfo?.transport === "gemini-image") {
           // Build parts: reference images first (if any), then the text prompt
           const referenceImages = (settings?.referenceImages as string[] | undefined) ?? [];
           const imageParts = referenceImages
@@ -80,7 +77,7 @@ function processDirectInBackground(
               responseModalities: ["IMAGE"],
               imageConfig: {
                 aspectRatio: (settings?.aspectRatio as string) ?? "1:1",
-                imageSize: (settings?.resolution as string) ?? "1K",
+                imageSize: (settings?.imageSize as string) ?? "1K",
               },
             },
           });
@@ -128,7 +125,16 @@ function processDirectInBackground(
             model: modelId,
             prompt,
             n: 1,
-            size: "1024x1024",
+            size: (settings?.size as "1024x1024" | "1024x1792" | "1792x1024" | undefined) ?? "1024x1024",
+            quality:
+              settings?.quality === "low" ||
+              settings?.quality === "medium" ||
+              settings?.quality === "high" ||
+              settings?.quality === "auto" ||
+              settings?.quality === "standard" ||
+              settings?.quality === "hd"
+                ? settings.quality
+                : undefined,
             response_format: "url",
           });
           const first = response.data?.[0];
@@ -145,8 +151,9 @@ function processDirectInBackground(
           body: JSON.stringify({
             model: modelId,
             prompt,
-            duration: 5,
-            aspect_ratio: (settings?.aspectRatio as string) ?? "16:9",
+            duration: Number(settings?.seconds ?? settings?.duration ?? 5),
+            aspect_ratio: (settings?.aspectRatio as string) ?? (settings?.size as string) ?? "16:9",
+            size: (settings?.size as string | undefined) ?? undefined,
           }),
         });
         if (!response.ok) {
@@ -231,12 +238,10 @@ export async function POST(request: Request) {
   }
 
   const { prompt, modelId, type, referenceImages } = parsed.data;
+  const liveModel = await getLiveModelById(modelId);
 
-  if (type === "image" && !isImageModel(modelId)) {
-    return NextResponse.json({ error: "Unknown image model" }, { status: 400 });
-  }
-  if (type === "video" && !isVideoModel(modelId)) {
-    return NextResponse.json({ error: "Unknown video model" }, { status: 400 });
+  if (!liveModel || liveModel.type !== type) {
+    return NextResponse.json({ error: `Unknown ${type} model` }, { status: 400 });
   }
 
   // Keep base64 reference images OUT of db-persisted settings to avoid multi-MB JSONB rows
@@ -263,10 +268,7 @@ export async function POST(request: Request) {
   const subscription = await getSubscriptionByUserId(session.user.id);
   const tier = subscription?.tier ?? "free";
 
-  const modelInfo = type === "image" ? IMAGE_MODELS[modelId] : VIDEO_MODELS[modelId];
-  if (!modelInfo) {
-    return NextResponse.json({ error: "Model not found" }, { status: 400 });
-  }
+  const modelInfo = liveModel;
 
   if (modelInfo.directOnly) {
     return NextResponse.json(
@@ -284,7 +286,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const creditCost = getModelCreditCost(modelId);
+  const creditCost = modelInfo.creditCost;
 
   const [newJob] = await db
     .insert(generationJobs)

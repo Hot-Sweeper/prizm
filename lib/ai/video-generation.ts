@@ -1,22 +1,26 @@
 import "server-only";
 import { z } from "zod";
-import { cometClient } from "./comet-client";
-import { isVideoModel } from "./models";
+import { getLiveModelById } from "./live-model-catalog";
 import type { GenerationRequest, GenerationResult } from "./types";
 
 const videoSettingsSchema = z.object({
-  duration: z.number().min(1).max(10).optional().default(5),
-  aspectRatio: z.enum(["16:9", "9:16", "1:1"]).optional().default("16:9"),
+  duration: z.number().min(1).max(15).optional(),
+  seconds: z.union([z.string(), z.number()]).optional(),
+  aspectRatio: z.string().optional(),
+  size: z.string().optional(),
 });
 
 export async function generateVideo(
   request: GenerationRequest
 ): Promise<GenerationResult> {
-  if (!isVideoModel(request.modelId)) {
+  const liveModel = await getLiveModelById(request.modelId);
+  if (!liveModel || liveModel.type !== "video") {
     throw new Error(`Invalid video model: ${request.modelId}`);
   }
 
   const settings = videoSettingsSchema.parse(request.settings ?? {});
+  const duration = typeof settings.duration === "number" ? settings.duration : Number(settings.seconds ?? 5);
+  const aspectRatio = settings.aspectRatio ?? settings.size ?? "16:9";
 
   // CometAPI video endpoint — uses a custom path (not OpenAI images API)
   // Using raw fetch via the underlying HTTP client since video is not part of
@@ -30,8 +34,9 @@ export async function generateVideo(
     body: JSON.stringify({
       model: request.modelId,
       prompt: request.prompt,
-      duration: settings.duration,
-      aspect_ratio: settings.aspectRatio,
+      duration,
+      aspect_ratio: aspectRatio,
+      size: settings.size,
     }),
   });
 

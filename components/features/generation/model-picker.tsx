@@ -2,13 +2,11 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Lock, CaretUp, Cpu } from "@phosphor-icons/react/dist/ssr";
-import { getProviderGroups, getModelInfo } from "@/lib/ai/models";
+import type { ModelInfo } from "@/lib/ai/models";
 import { ModelBrandIcon } from "./model-brand-icon";
 
-type GenerationType = "image" | "video";
-
 interface ModelPickerProps {
-  type: GenerationType;
+  models: Array<ModelInfo & { id: string }>;
   value: string;
   onChange: (modelId: string) => void;
   userTier: "free" | "pro" | "max";
@@ -17,11 +15,17 @@ interface ModelPickerProps {
 
 const TIER_ORDER = { free: 0, pro: 1, max: 2 };
 
-export function ModelPicker({ type, value, onChange, userTier, isWhitelisted = false }: ModelPickerProps) {
+export function ModelPicker({ models, value, onChange, userTier, isWhitelisted = false }: ModelPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const groups = getProviderGroups(type);
-  const activeModelInfo = value ? getModelInfo(value) : null;
+  const activeModelInfo = useMemo(() => models.find((model) => model.id === value) ?? null, [models, value]);
+  const groups = useMemo(() => {
+    return models.reduce<Record<string, Array<{ id: string; info: ModelInfo }>>>((accumulator, model) => {
+      const group = accumulator[model.provider] ?? (accumulator[model.provider] = []);
+      group.push({ id: model.id, info: model });
+      return accumulator;
+    }, {});
+  }, [models]);
   const groupEntries = useMemo(() => Object.entries(groups), [groups]);
 
   useEffect(() => {
