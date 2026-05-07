@@ -15,6 +15,16 @@ interface ModelPickerProps {
 
 const TIER_ORDER = { free: 0, pro: 1, max: 2 };
 
+const PROVIDER_PRIORITY: Record<string, number> = {
+  openai: 0,
+  google: 1,
+};
+
+function getProviderSortValue(provider: string) {
+  const key = provider.trim().toLowerCase();
+  return PROVIDER_PRIORITY[key] ?? 100;
+}
+
 export function ModelPicker({ models, value, onChange, userTier, isWhitelisted = false }: ModelPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,7 +36,15 @@ export function ModelPicker({ models, value, onChange, userTier, isWhitelisted =
       return accumulator;
     }, {});
   }, [models]);
-  const groupEntries = useMemo(() => Object.entries(groups), [groups]);
+  const groupEntries = useMemo(
+    () =>
+      Object.entries(groups).sort(([providerA], [providerB]) => {
+        const priorityDiff = getProviderSortValue(providerA) - getProviderSortValue(providerB);
+        if (priorityDiff !== 0) return priorityDiff;
+        return providerA.localeCompare(providerB);
+      }),
+    [groups],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
