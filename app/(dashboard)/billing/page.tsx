@@ -1,32 +1,78 @@
-import { auth } from "@/auth";
-import { getSubscriptionByUserId } from "@/lib/stripe/subscription";
-import { getBalances } from "@/lib/credits";
+"use client";
+
+import { useEffect, useState } from "react";
 import { PLANS } from "@/lib/stripe/plans";
 import { Check } from "@phosphor-icons/react/dist/ssr";
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Billing — PRIZM",
 };
 
-export default async function BillingPage() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+type Tier = "free" | "pro" | "max";
 
-  const [subscription, balances] = await Promise.all([
-    getSubscriptionByUserId(session.user.id).catch(() => null),
-    getBalances(session.user.id).catch(() => ({ image: 0, video: 0 })),
-  ]);
+const FETCH_TIMEOUT_MS = 8000;
 
-  const currentTier = subscription?.tier ?? "free";
-  const status = subscription?.status ?? "active";
+function createTimeoutSignal(timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return { signal: controller.signal, clear: () => clearTimeout(timeoutId) };
+}
 
-  const V   = "var(--color-primary)";
-  const VL  = "var(--color-secondary)";
+export default function BillingPage() {
+  const [currentTier, setCurrentTier] = useState<Tier>("free");
+  const [status, setStatus] = useState("active");
+  const [balances, setBalances] = useState({ image: 0, video: 0 });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrap() {
+      const timeout = createTimeoutSignal(FETCH_TIMEOUT_MS);
+      try {
+        const response = await fetch("/api/billing/overview", {
+          cache: "no-store",
+          credentials: "include",
+          signal: timeout.signal,
+        });
+
+        if (!response.ok) {
+          console.error("[PRIZM][billing] overview fetch failed", response.status);
+          return;
+        }
+
+        const data = (await response.json()) as {
+          currentTier?: Tier;
+          status?: string;
+          balances?: { image?: number; video?: number };
+        };
+
+        if (cancelled) return;
+
+        if (data.currentTier) setCurrentTier(data.currentTier);
+        if (data.status) setStatus(data.status);
+        if (typeof data.balances?.image === "number" && typeof data.balances?.video === "number") {
+          setBalances({ image: data.balances.image, video: data.balances.video });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("[PRIZM][billing] overview fetch threw", error);
+        }
+      } finally {
+        timeout.clear();
+      }
+    }
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const V = "var(--color-primary)";
+  const VL = "var(--color-secondary)";
   const VLL = "var(--color-accent)";
 
   const card: CSSProperties = {
@@ -38,8 +84,6 @@ export default async function BillingPage() {
 
   return (
     <main id="maincontent" tabIndex={-1} style={{ maxWidth: "1024px", margin: "0 auto", padding: "2rem 1.5rem", width: "100%", overflowY: "auto", height: "100%", color: "#fff", fontFamily: "var(--font-sans)" }}>
-
-      {/* Page heading */}
       <div style={{ marginBottom: "2rem" }}>
         <h1 className="font-display" style={{ fontSize: "2.25rem", letterSpacing: "0.06em", marginBottom: "0.375rem" }}>
           BILLING &amp; CREDITS
@@ -49,10 +93,7 @@ export default async function BillingPage() {
         </p>
       </div>
 
-      {/* Current plan + credits row */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "2.5rem" }}>
-
-        {/* Current plan */}
         <div style={card}>
           <p style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: "0.625rem" }}>
             Current Plan
@@ -88,16 +129,15 @@ export default async function BillingPage() {
           </form>
         </div>
 
-        {/* Credit balances */}
         <div style={card}>
           <p style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: "0.875rem" }}>
             Available Credits
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
             {[
-              { label: "Images",        value: balances.image, icon: "Img" },
-              { label: "Video credits", value: balances.video, icon: "Vid" },
-            ].map(({ label, value, icon }) => (
+              { label: "Images", value: balances.image },
+              { label: "Video credits", value: balances.video },
+            ].map(({ label, value }) => (
               <div key={label} style={{
                 background: "rgba(124,58,237,0.08)",
                 border: "1px solid rgba(167,139,250,0.15)",
@@ -112,7 +152,6 @@ export default async function BillingPage() {
         </div>
       </div>
 
-      {/* Plans */}
       <h2 className="font-display" style={{ fontSize: "1.6rem", letterSpacing: "0.06em", marginBottom: "1.25rem", color: "rgba(255,255,255,0.7)" }}>
         PLANS
       </h2>
@@ -130,16 +169,16 @@ export default async function BillingPage() {
                 borderRadius: "1.25rem",
                 padding: "1.5rem",
                 border: isCurrent
-                  ? `1px solid rgba(167,139,250,0.5)`
+                  ? "1px solid rgba(167,139,250,0.5)"
                   : isHighlight
-                    ? `1px solid rgba(124,58,237,0.35)`
+                    ? "1px solid rgba(124,58,237,0.35)"
                     : "1px solid rgba(255,255,255,0.07)",
                 background: isCurrent
                   ? "rgba(124,58,237,0.12)"
                   : isHighlight
                     ? "rgba(124,58,237,0.06)"
                     : "rgba(255,255,255,0.025)",
-                boxShadow: isCurrent ? `0 0 40px rgba(124,58,237,0.18)` : "none",
+                boxShadow: isCurrent ? "0 0 40px rgba(124,58,237,0.18)" : "none",
               }}
             >
               {isCurrent && (
@@ -176,18 +215,6 @@ export default async function BillingPage() {
                   <Check size={14} style={{ color: VL, flexShrink: 0, marginTop: "2px" }} aria-hidden />
                   <span><strong style={{ color: "#fff" }}>{plan.videoCredits}</strong> video credits / mo</span>
                 </li>
-                {tier !== "free" && (
-                  <li style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "0.875rem", color: "rgba(255,255,255,0.6)" }}>
-                    <Check size={14} style={{ color: VL, flexShrink: 0, marginTop: "2px" }} aria-hidden />
-                    <span>All premium models</span>
-                  </li>
-                )}
-                {tier === "max" && (
-                  <li style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "0.875rem", color: "rgba(255,255,255,0.6)" }}>
-                    <Check size={14} style={{ color: VL, flexShrink: 0, marginTop: "2px" }} aria-hidden />
-                    <span>Priority queue bypass</span>
-                  </li>
-                )}
               </ul>
 
               <form action="/api/billing/create-checkout" method="POST">
@@ -223,5 +250,3 @@ export default async function BillingPage() {
     </main>
   );
 }
-
-
