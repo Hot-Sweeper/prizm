@@ -21,7 +21,7 @@ export default async function GeneratePage() {
   const whitelisted = isWhitelistedEmail(session.user.email);
 
   // Race DB calls against a timeout so a hung DB connection never blocks SSR.
-  const withTimeout = <T>(p: Promise<T>, fallback: T, ms = 5000): Promise<T> =>
+  const withTimeout = <T,>(p: Promise<T>, fallback: T, ms = 5000): Promise<T> =>
     Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))]);
 
   const [balances, subscription, recentJobs] = await Promise.all([
