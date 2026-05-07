@@ -1,18 +1,33 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { PrizmLogo } from "@/components/prizm-logo";
 import { MagicWand as Wand2, Image as Images, CreditCard } from "@phosphor-icons/react/dist/ssr";
 
 const NAV_LINKS = [
-  { href: "/generate", label: "Studio", Icon: Wand2 },
-  { href: "/gallery",  label: "Gallery",  Icon: Images },
-  { href: "/billing",  label: "Billing",  Icon: CreditCard },
+  { href: "/generate#studio", label: "Studio", tab: "studio", Icon: Wand2 },
+  { href: "/generate#gallery", label: "Gallery", tab: "gallery", Icon: Images },
+  { href: "/generate#billing", label: "Billing", tab: "billing", Icon: CreditCard },
 ] as const;
 
 export function DashboardSidebar() {
   const pathname = usePathname();
+  const [hashTab, setHashTab] = useState("studio");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateHash = () => {
+      const value = window.location.hash.replace(/^#/, "").toLowerCase();
+      setHashTab(value || "studio");
+    };
+
+    updateHash();
+    window.addEventListener("hashchange", updateHash);
+    return () => window.removeEventListener("hashchange", updateHash);
+  }, []);
 
   return (
     <aside
@@ -37,8 +52,11 @@ export function DashboardSidebar() {
 
       <nav aria-label="Main navigation" style={{ width: "100%", flex: 1 }}>
         <ul style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", listStyle: "none", width: "100%", padding: 0, margin: 0 }} role="list">
-          {NAV_LINKS.map(({ href, label, Icon }) => {
-            const isActive = pathname.startsWith(href);
+          {NAV_LINKS.map(({ href, label, tab, Icon }) => {
+            const isActive = pathname.startsWith("/generate")
+              ? hashTab === tab
+              : (pathname.startsWith("/gallery") && tab === "gallery") ||
+                (pathname.startsWith("/billing") && tab === "billing");
             return (
               <li key={href} style={{ width: "100%", display: "flex", justifyContent: "center" }}>
                 <Link
