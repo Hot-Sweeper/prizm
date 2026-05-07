@@ -2,11 +2,11 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { generationJobs } from "@/lib/db/schema";
 import { deductCredits } from "@/lib/credits";
-import { isWhitelistedForRequest } from "@/lib/credits/whitelist";
+import { isLocalhostRequestUrl, isWhitelistedForRequest } from "@/lib/credits/whitelist";
 import { enqueueGeneration } from "@/lib/queue/enqueue";
 import { cometClient } from "@/lib/ai/comet-client";
-import { getModelInfo } from "@/lib/ai/models";
-import { getLiveModelById } from "@/lib/ai/live-model-catalog";
+import { getModelInfo, type ModelInfo } from "@/lib/ai/models";
+import { getLiveModelById, type LiveModelCatalogEntry } from "@/lib/ai/live-model-catalog";
 import { getSubscriptionByUserId } from "@/lib/stripe/subscription";
 import { TIER_PRIORITY } from "@/lib/queue/job-types";
 import { NextResponse } from "next/server";
@@ -222,6 +222,139 @@ async function directGenerate(
   return NextResponse.json({ jobId: newJob.id, status: "queued" }, { status: 201 });
 }
 
+async function directGenerateWithoutDb(
+  type: "image" | "video",
+  modelId: string,
+  prompt: string,
+  modelInfo: LiveModelCatalogEntry | ModelInfo,
+  settings?: Record<string, unknown>
+) {
+  const startedAt = Date.now();
+  let url: string;
+
+  if (type === "image") {
+    if (modelInfo.transport === "gemini-image") {
+      const referenceImages = (settings?.referenceImages as string[] | undefined) ?? [];
+      const imageParts = referenceImages
+        .map((dataUrl) => {
+          const match = /^data:(image\/[a-z+]+);base64,(.+)$/.exec(dataUrl);
+          if (!match) return null;
+          return { inlineData: { mimeType: match[1], data: match[2] } };
+        })
+        .filter(Boolean);
+
+      const requestBody = JSON.stringify({
+        contents: [{ role: "user", parts: [...imageParts, { text: prompt }] }],
+        generationConfig: {
+          responseModalities: ["IMAGE"],
+          imageConfig: {
+            aspectRatio: (settings?.aspectRatio as string) ?? "1:1",
+            imageSize: (settings?.imageSize as string) ?? "1K",
+          },
+        },
+      });
+
+      const response = await fetch(
+        `https://api.cometapi.com/v1beta/models/${modelId}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": process.env.COMETAPI_API_KEY ?? "",
+          },
+          body: requestBody,
+        }
+      );
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Gemini image generation failed (${response.status}): ${errorBody}`);
+      }
+
+      const data = (await response.json()) as {
+        candidates?: Array<{
+          content?: {
+            parts?: Array<{
+              inlineData?: { mimeType?: string; data?: string };
+            }>;
+          };
+        }>;
+      };
+
+      const parts = data.candidates?.[0]?.content?.parts ?? [];
+      const imagePart = parts.find((part) => part.inlineData?.data);
+      const inlineData = imagePart?.inlineData;
+
+      if (!inlineData?.data) {
+        throw new Error("Gemini returned no image data");
+      }
+
+      url = `data:${inlineData.mimeType ?? "image/png"};base64,${inlineData.data}`;
+    } else {
+      const response = await cometClient.images.generate({
+        model: modelId,
+        prompt,
+        n: 1,
+        size: (settings?.size as "1024x1024" | "1024x1792" | "1792x1024" | undefined) ?? "1024x1024",
+        quality:
+          settings?.quality === "low" ||
+          settings?.quality === "medium" ||
+          settings?.quality === "high" ||
+          settings?.quality === "auto" ||
+          settings?.quality === "standard" ||
+          settings?.quality === "hd"
+            ? settings.quality
+            : undefined,
+        response_format: "url",
+      });
+      const first = response.data?.[0];
+      if (!first?.url) throw new Error("CometAPI returned no image URL");
+      url = first.url;
+    }
+  } else {
+    const response = await fetch("https://api.cometapi.com/v1/videos/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.COMETAPI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: modelId,
+        prompt,
+        duration: Number(settings?.seconds ?? settings?.duration ?? 5),
+        aspect_ratio: (settings?.aspectRatio as string) ?? (settings?.size as string) ?? "16:9",
+        size: (settings?.size as string | undefined) ?? undefined,
+      }),
+    });
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Video generation failed (${response.status}): ${errorBody}`);
+    }
+    const data = (await response.json()) as Record<string, unknown>;
+    const resultUrl = data.url as string;
+    if (!resultUrl) throw new Error("CometAPI returned no video URL");
+    url = resultUrl;
+  }
+
+  return NextResponse.json(
+    {
+      status: "completed",
+      jobId: null,
+      url,
+      type,
+      apiInfo: {
+        model: modelId,
+        modelName: modelInfo.displayName,
+        provider: modelInfo.provider,
+        generationTimeMs: Date.now() - startedAt,
+        estimatedCostUSD: modelInfo.estimatedCostUSD ?? null,
+        pricingLabel: modelInfo.pricingLabel,
+      },
+    },
+    { status: 200 }
+  );
+}
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -250,6 +383,7 @@ export async function POST(request: Request) {
     ...parsed.data.settings,
     ...(referenceImages?.length && { referenceImages }),
   };
+  const isLocalDev = isLocalhostRequestUrl(request.url);
 
   // Whitelisted users: direct CometAPI call — no queue, no credits
   if (isWhitelistedForRequest(session.user.email, request.url)) {
@@ -257,6 +391,20 @@ export async function POST(request: Request) {
       return await directGenerate(session.user.id, type, modelId, prompt, dbSettings, runtimeSettings);
     } catch (err) {
       console.error("[generate] directGenerate failed:", err instanceof Error ? err.message : err);
+      if (isLocalDev) {
+        try {
+          return await directGenerateWithoutDb(type, modelId, prompt, liveModel, runtimeSettings);
+        } catch (fallbackErr) {
+          console.error("[generate] localhost fallback failed:", fallbackErr instanceof Error ? fallbackErr.message : fallbackErr);
+          return NextResponse.json(
+            {
+              error:
+                "Local direct generation failed. Check COMETAPI_API_KEY and local network access to CometAPI.",
+            },
+            { status: 503 }
+          );
+        }
+      }
       return NextResponse.json(
         { error: "Generation failed. Please try again later." },
         { status: 500 }
