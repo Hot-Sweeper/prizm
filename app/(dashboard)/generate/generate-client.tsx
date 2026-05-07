@@ -80,6 +80,13 @@ export function GenerateClient({
   const [latestResultType, setLatestResultType] = useState<string | null>(null);
   const [history, setHistory] = useState<GenerationJob[]>(initialHistory);
 
+  useEffect(() => {
+    console.warn("[PRIZM][debug] generate client logger active", {
+      initialHistoryCount: initialHistory.length,
+      timestamp: new Date().toISOString(),
+    });
+  }, [initialHistory.length]);
+
   const jobsById = useMemo(() => {
     const map = new Map<string, GenerationJob>();
     for (const job of history) map.set(job.id, job);
@@ -127,7 +134,7 @@ export function GenerateClient({
   );
 
   function handleJobCreated(jobId: string, prompt: string, type: string, modelId: string) {
-    console.debug("[PRIZM][queue] job created", { jobId, type, modelId });
+    console.info("[PRIZM][queue] job created", { jobId, type, modelId });
     setActiveJobIds((prev) => [jobId, ...prev]);
     setLatestResultUrl(null);
     const newJob: GenerationJob = {
@@ -197,7 +204,7 @@ export function GenerateClient({
       }
 
       if (newestCompleted?.resultUrl) {
-        console.debug("[PRIZM][queue] newest completed job", {
+        console.info("[PRIZM][queue] newest completed job", {
           jobId: newestCompleted.id,
           type: newestCompleted.type,
         });
@@ -223,7 +230,7 @@ export function GenerateClient({
       });
 
       if (completedOrFailedIds.size > 0) {
-        console.debug("[PRIZM][queue] removing finished jobs from active list", {
+        console.info("[PRIZM][queue] removing finished jobs from active list", {
           finishedCount: completedOrFailedIds.size,
         });
         setActiveJobIds((prev) => prev.filter((id) => !completedOrFailedIds.has(id)));
@@ -243,7 +250,7 @@ export function GenerateClient({
 
     const hasProcessing = activeJobs.some((job) => job.status === "processing");
     const intervalMs = hasProcessing ? FAST_POLL_MS : SLOW_POLL_MS;
-    console.debug("[PRIZM][queue] poll loop started", {
+    console.info("[PRIZM][queue] poll loop started", {
       activeJobs: activeJobIds.length,
       intervalMs,
     });
@@ -302,7 +309,7 @@ export function GenerateClient({
               isWhitelisted={isWhitelisted}
               onJobCreated={(jobId, prompt, type, modelId) => handleJobCreated(jobId, prompt, type, modelId)}
               onDirectResult={(res, prompt, type) => {
-                console.debug("[PRIZM][generate] direct result received", {
+                console.info("[PRIZM][generate] direct result received", {
                   jobId: res.jobId,
                   type,
                   model: res.apiInfo.model,

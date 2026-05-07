@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Image as ImageIcon, VideoCamera as VideoIcon, MagicWand as Wand2, Paperclip, X as XIcon } from "@phosphor-icons/react/dist/ssr";
 import { ModelPicker } from "./model-picker";
 import { AspectRatioPicker } from "./aspect-ratio-picker";
@@ -74,6 +74,12 @@ export function GenerationForm({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
+
+  useEffect(() => {
+    console.warn("[PRIZM][debug] generation form logger active", {
+      timestamp: new Date().toISOString(),
+    });
+  }, []);
 
   const creditCost = modelId ? getModelCreditCost(modelId) : 0;
   const selectedModel = modelId ? getModelInfo(modelId) : null;
@@ -185,7 +191,7 @@ export function GenerationForm({
 
     setIsSubmitting(true);
     setError(null);
-    console.debug("[PRIZM][generate] submit started", {
+    console.info("[PRIZM][generate] submit started", {
       type,
       modelId,
       promptLength: prompt.trim().length,
@@ -221,7 +227,7 @@ export function GenerationForm({
       });
 
       const data = await response.json();
-      console.debug("[PRIZM][generate] response received", {
+      console.info("[PRIZM][generate] response received", {
         ok: response.ok,
         status: response.status,
         statusText: response.statusText,
@@ -245,7 +251,7 @@ export function GenerationForm({
 
       // Queued generation: normal pipeline
       onJobCreated(data.jobId as string, prompt.trim(), type, modelId);
-      console.debug("[PRIZM][generate] queued job created", {
+      console.info("[PRIZM][generate] queued job created", {
         jobId: data.jobId,
         type,
         modelId,
