@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { getBalances } from "@/lib/credits";
+import { isWhitelistedEmail } from "@/lib/credits/whitelist";
 import { getSubscriptionByUserId } from "@/lib/stripe/subscription";
 import { NextResponse } from "next/server";
 
@@ -30,8 +31,11 @@ export async function GET() {
     withTimeout(getBalances(session.user.id), 5000, "getBalances").catch(() => ({ image: 0, video: 0 })),
   ]);
 
+  const whitelisted = isWhitelistedEmail(session.user.email);
+
   return NextResponse.json({
-    currentTier: subscription?.tier ?? "free",
+    currentTier: whitelisted ? "max" : subscription?.tier ?? "free",
+    isWhitelisted: whitelisted,
     status: subscription?.status ?? "active",
     balances,
   });

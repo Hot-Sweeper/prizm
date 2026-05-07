@@ -49,6 +49,15 @@ interface QueueJobPayload {
   updatedAt?: string | null;
 }
 
+interface BillingOverviewResponse {
+  currentTier?: "free" | "pro" | "max";
+  isWhitelisted?: boolean;
+}
+
+interface GalleryResponse {
+  jobs?: GenerationJob[];
+}
+
 interface GenerateClientProps {
   userTier: "free" | "pro" | "max";
   imageBalance: number;
@@ -81,6 +90,22 @@ export function GenerateClient({
   const [latestResultUrl, setLatestResultUrl] = useState<string | null>(null);
   const [latestResultType, setLatestResultType] = useState<string | null>(null);
   const [history, setHistory] = useState<GenerationJob[]>(initialHistory);
+  const [effectiveTier, setEffectiveTier] = useState<"free" | "pro" | "max">(userTier);
+  const [effectiveWhitelisted, setEffectiveWhitelisted] = useState(isWhitelisted);
+
+  useEffect(() => {
+    setEffectiveTier(userTier);
+    setEffectiveWhitelisted(isWhitelisted);
+  }, [userTier, isWhitelisted]);
+
+  useEffect(() => {
+    setHistory(initialHistory);
+    setActiveJobIds(
+      initialHistory
+        .filter((job) => job.status === "queued" || job.status === "processing")
+        .map((job) => job.id)
+    );
+  }, [initialHistory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,6 +139,57 @@ export function GenerateClient({
     }
 
     void bootstrapBalances();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapStudio() {
+      try {
+        const [billingRes, galleryRes] = await Promise.all([
+          fetch("/api/billing/overview", {
+            cache: "no-store",
+            credentials: "include",
+          }),
+          fetch("/api/gallery?page=1", {
+            cache: "no-store",
+            credentials: "include",
+          }),
+        ]);
+
+        if (!cancelled && billingRes.ok) {
+          const billing = (await billingRes.json()) as BillingOverviewResponse;
+          if (billing.currentTier) {
+            setEffectiveTier(billing.currentTier);
+          }
+          if (typeof billing.isWhitelisted === "boolean") {
+            setEffectiveWhitelisted(billing.isWhitelisted);
+          }
+        }
+
+        if (!cancelled && galleryRes.ok) {
+          const gallery = (await galleryRes.json()) as GalleryResponse;
+          if (Array.isArray(gallery.jobs)) {
+            setHistory(gallery.jobs);
+            setActiveJobIds(
+              gallery.jobs
+                .filter((job) => job.status === "queued" || job.status === "processing")
+                .map((job) => job.id)
+            );
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("studio bootstrap failed", error);
+        }
+      }
+    }
+
+    void bootstrapStudio();
 
     return () => {
       cancelled = true;
@@ -357,10 +433,10 @@ export function GenerateClient({
         <div style={{ position: "absolute", bottom: "2rem", left: "50%", transform: "translateX(-50%)", width: "calc(100% - 4rem)", maxWidth: "1000px", zIndex: 10 }}>
           <div style={{ background: "rgba(10,10,10,0.85)", backdropFilter: "blur(24px) saturate(200%)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "2rem", padding: "1.5rem", boxShadow: "0 20px 40px rgba(0,0,0,0.6)" }}>
             <GenerationForm
-              userTier={userTier}
+              userTier={effectiveTier}
               imageBalance={balancesLoading ? 999_999 : resolvedImageBalance}
               videoBalance={balancesLoading ? 999_999 : resolvedVideoBalance}
-              isWhitelisted={isWhitelisted}
+              isWhitelisted={effectiveWhitelisted}
               onJobCreated={(jobId, prompt, type, modelId) => handleJobCreated(jobId, prompt, type, modelId)}
               onDirectResult={(res, prompt, type) => {
                 console.info("[PRIZM][generate] direct result received", {

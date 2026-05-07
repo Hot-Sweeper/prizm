@@ -122,7 +122,10 @@ export function ModelPicker({ models, value, onChange, userTier, isWhitelisted =
                 {provider}
               </div>
               {models.map(({ id, info: model }) => {
-                const locked = TIER_ORDER[model.minTier] > TIER_ORDER[userTier] || (!!model.directOnly && !isWhitelisted);
+                const locked = !isWhitelisted && (
+                  TIER_ORDER[model.minTier] > TIER_ORDER[userTier] ||
+                  !!model.directOnly
+                );
                 const checked = value === id;
                 const V = "var(--color-primary)";
                 const VL = "var(--color-secondary)";
