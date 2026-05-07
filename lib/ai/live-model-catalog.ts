@@ -130,9 +130,39 @@ function safeJsonParse(value: string) {
   }
 }
 
+function looksLikeImageModel(model: CometApiModelRecord) {
+  const haystack = `${model.id} ${model.name ?? ""}`.toLowerCase();
+  return [
+    "image",
+    "dall-e",
+    "gpt-image",
+    "gemini",
+    "nano banana",
+    "seedream",
+    "flux",
+    "ideogram",
+    "recraft",
+    "stable-diffusion",
+    "sdxl",
+    "midjourney",
+    "bria",
+  ].some((keyword) => haystack.includes(keyword));
+}
+
+function looksLikeVideoModel(model: CometApiModelRecord) {
+  const haystack = `${model.id} ${model.name ?? ""}`.toLowerCase();
+  return ["video", "sora", "veo", "kling", "runway", "seedance", "luma", "wan", "minimax"].some((keyword) => haystack.includes(keyword));
+}
+
 function detectGenerationType(model: CometApiModelRecord, endpointTokens: Set<string>): GenerationType | null {
-  if (model.model_type === "image" || model.model_type === "video") {
-    return model.model_type;
+  const explicitType = (model.model_type ?? "").trim().toLowerCase();
+  if (explicitType) {
+    if (explicitType === "image" || explicitType === "video") {
+      return explicitType;
+    }
+
+    // Explicit non-image/video type from provider should not be coerced.
+    return null;
   }
 
   if (model.features?.includes("text-to-image") || model.features?.includes("image-editing") || model.features?.includes("image-to-image")) {
@@ -144,11 +174,14 @@ function detectGenerationType(model: CometApiModelRecord, endpointTokens: Set<st
   }
 
   // Fallback to endpoint aliases used by Comet when type/features are omitted.
-  if (endpointTokens.has("openai") || endpointTokens.has("image-generation") || endpointTokens.has("/v1/images/generations")) {
+  if (
+    (endpointTokens.has("openai") || endpointTokens.has("image-generation") || endpointTokens.has("/v1/images/generations")) &&
+    looksLikeImageModel(model)
+  ) {
     return "image";
   }
 
-  if (endpointTokens.has("video-generation") || endpointTokens.has("/v1/videos")) {
+  if ((endpointTokens.has("video-generation") || endpointTokens.has("/v1/videos")) && looksLikeVideoModel(model)) {
     return "video";
   }
 
