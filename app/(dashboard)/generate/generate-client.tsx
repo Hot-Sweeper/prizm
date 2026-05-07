@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { GenerationForm } from "@/components/features/generation/generation-form";
-import type { DirectResult } from "@/components/features/generation/generation-form";
 import { QueueStatus } from "@/components/features/generation/queue-status";
 import { HistoryCard } from "@/components/features/generation/history-card";
 import { CreditDisplay } from "@/components/features/generation/credit-display";
-import { Sparkle as Sparkles, Timer, CurrencyDollar, Cpu, Lightning, Clock, Image as ImageIcon, FilmSlate } from "@phosphor-icons/react/dist/ssr";
+import { Sparkle as Sparkles, Image as ImageIcon, FilmSlate } from "@phosphor-icons/react/dist/ssr";
 import { getModelInfo } from "@/lib/ai/models";
 import { ModelBrandIcon } from "@/components/features/generation/model-brand-icon";
 import Image from "next/image";
@@ -25,6 +24,31 @@ interface GenerationJob {
   generationTimeMs?: number;
 }
 
+interface HistoryJob {
+  id: string;
+  type: string;
+  status: string;
+  modelId: string | null;
+  prompt: string;
+  resultUrl: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  errorMessage?: string | null;
+  generationTimeMs?: number;
+}
+
+type QueueJobStatus = "queued" | "processing" | "completed" | "failed";
+
+interface QueueJobPayload {
+  id: string;
+  status: QueueJobStatus;
+  type: "image" | "video" | null;
+  prompt: string | null;
+  resultUrl: string | null;
+  errorMessage: string | null;
+  updatedAt?: string | null;
+}
+
 interface GenerateClientProps {
   userTier: "free" | "pro" | "max";
   imageBalance: number;
@@ -34,6 +58,8 @@ interface GenerateClientProps {
 }
 
 const VL = "var(--color-secondary)";
+const FAST_POLL_MS = 2000;
+const SLOW_POLL_MS = 4500;
 
 export function GenerateClient({
   userTier,
@@ -46,6 +72,52 @@ export function GenerateClient({
   const [latestResultUrl, setLatestResultUrl] = useState<string | null>(null);
   const [latestResultType, setLatestResultType] = useState<string | null>(null);
   const [history, setHistory] = useState<GenerationJob[]>(initialHistory);
+
+  const jobsById = useMemo(() => {
+    const map = new Map<string, GenerationJob>();
+    for (const job of history) map.set(job.id, job);
+    return map;
+  }, [history]);
+
+  const activeJobs = useMemo(
+    () =>
+      activeJobIds
+        .map((id) => jobsById.get(id))
+        .filter((job): job is GenerationJob => Boolean(job)),
+    [activeJobIds, jobsById]
+  );
+
+  const activeJobIdSet = useMemo(() => new Set(activeJobIds), [activeJobIds]);
+
+  const completedHistory = useMemo(
+    () => history.filter((job) => !activeJobIdSet.has(job.id)),
+    [history, activeJobIdSet]
+  );
+
+  const historyCardJobs = useMemo<HistoryJob[]>(
+    () =>
+      completedHistory.map((job) => ({
+        id: job.id,
+        type: job.type,
+        status: job.status,
+        modelId: job.modelId,
+        prompt: job.prompt,
+        resultUrl: job.resultUrl,
+        createdAt:
+          typeof job.createdAt === "string"
+            ? job.createdAt
+            : (job.createdAt ?? new Date()).toISOString(),
+        updatedAt:
+          typeof job.updatedAt === "string"
+            ? job.updatedAt
+            : job.updatedAt
+              ? job.updatedAt.toISOString()
+              : undefined,
+        errorMessage: job.errorMessage,
+        generationTimeMs: job.generationTimeMs,
+      })),
+    [completedHistory]
+  );
 
   function handleJobCreated(jobId: string, prompt: string, type: string, modelId: string) {
     setActiveJobIds((prev) => [jobId, ...prev]);
@@ -63,6 +135,76 @@ export function GenerateClient({
     };
     setHistory((prev) => [newJob, ...prev]);
   }
+
+  const pollQueueStatuses = useCallback(async () => {
+    if (activeJobIds.length === 0) return;
+
+    try {
+      const res = await fetch("/api/queue/statuses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ jobIds: activeJobIds }),
+      });
+
+      if (!res.ok) return;
+
+      const data = (await res.json()) as { jobs: QueueJobPayload[] };
+      if (!Array.isArray(data.jobs) || data.jobs.length === 0) return;
+
+      const completedOrFailedIds = new Set<string>();
+      let newestCompleted: QueueJobPayload | null = null;
+
+      for (const job of data.jobs) {
+        if (job.status === "completed" || job.status === "failed") {
+          completedOrFailedIds.add(job.id);
+        }
+        if (job.status === "completed" && job.resultUrl) {
+          newestCompleted = job;
+        }
+      }
+
+      if (newestCompleted?.resultUrl) {
+        setLatestResultUrl(newestCompleted.resultUrl);
+        if (newestCompleted.type) setLatestResultType(newestCompleted.type);
+      }
+
+      setHistory((prev) => {
+        const updates = new Map(data.jobs.map((job) => [job.id, job]));
+        return prev.map((job) => {
+          const update = updates.get(job.id);
+          if (!update) return job;
+          return {
+            ...job,
+            status: update.status,
+            type: update.type ?? job.type,
+            prompt: update.prompt ?? job.prompt,
+            resultUrl: update.resultUrl,
+            errorMessage: update.errorMessage,
+            updatedAt: update.updatedAt ?? job.updatedAt,
+          };
+        });
+      });
+
+      if (completedOrFailedIds.size > 0) {
+        setActiveJobIds((prev) => prev.filter((id) => !completedOrFailedIds.has(id)));
+      }
+    } catch {
+      // Keep polling loop resilient to transient network failures.
+    }
+  }, [activeJobIds]);
+
+  useEffect(() => {
+    if (activeJobIds.length === 0) return;
+
+    const hasProcessing = activeJobs.some((job) => job.status === "processing");
+    const intervalMs = hasProcessing ? FAST_POLL_MS : SLOW_POLL_MS;
+    const intervalId = setInterval(() => {
+      void pollQueueStatuses();
+    }, intervalMs);
+
+    return () => clearInterval(intervalId);
+  }, [activeJobIds.length, activeJobs, pollQueueStatuses]);
 
   return (
     <div style={{ flex: 1, display: "flex", height: "100%", overflow: "hidden", width: "100%" }}>
@@ -142,8 +284,8 @@ export function GenerateClient({
         </div>
 
         <div className="model-picker-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "0.5rem 1.5rem 1.5rem 1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {activeJobIds.map(id => {
-            const jobInfo = history.find(j => j.id === id);
+          {activeJobs.map((jobInfo) => {
+            const id = jobInfo.id;
             const modelInfo = jobInfo?.modelId ? getModelInfo(jobInfo.modelId) : null;
             const isVideo = jobInfo?.type === "video";
             return (
@@ -174,11 +316,13 @@ export function GenerateClient({
                 {/* Status strip */}
                 <div style={{ padding: "0.5rem 0.875rem 0.75rem 0.875rem" }}>
                   <QueueStatus
-                    jobId={id}
-                    onComplete={(url) => {
-                      setActiveJobIds(prev => prev.filter(j => j !== id));
-                      setLatestResultUrl(url);
-                      setHistory(prev => prev.map(j => j.id === id ? { ...j, status: "completed", resultUrl: url, updatedAt: new Date().toISOString() } : j));
+                    jobState={{
+                      id,
+                      status: jobInfo.status as QueueJobStatus,
+                      resultUrl: jobInfo.resultUrl,
+                      errorMessage: jobInfo.errorMessage,
+                      prompt: jobInfo.prompt,
+                      type: (jobInfo.type as "image" | "video") ?? null,
                     }}
                   />
                 </div>
@@ -187,10 +331,10 @@ export function GenerateClient({
           })}
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {history.filter(job => !activeJobIds.includes(job.id)).map((job) => (
+            {historyCardJobs.map((job) => (
               <HistoryCard
                 key={job.id}
-                job={job as any}
+                job={job}
                 onClick={() => {
                   if (job.resultUrl) {
                     setLatestResultUrl(job.resultUrl);

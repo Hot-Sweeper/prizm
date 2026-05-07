@@ -1,16 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
 import { XCircle, Clock, Spinner as Loader2 } from "@phosphor-icons/react/dist/ssr";
 
 type JobStatus = "queued" | "processing" | "completed" | "failed";
 
-interface QueueStatusProps {
-  jobId: string;
-  onComplete?: (resultUrl: string) => void;
-}
-
 interface JobState {
+  id?: string;
   status: JobStatus;
   resultUrl: string | null;
   errorMessage: string | null;
@@ -18,46 +13,11 @@ interface JobState {
   type: "image" | "video" | null;
 }
 
-const POLL_INTERVAL_MS = 3000;
+interface QueueStatusProps {
+  jobState: JobState;
+}
 
-export function QueueStatus({ jobId, onComplete }: QueueStatusProps) {
-  const [jobState, setJobState] = useState<JobState>({
-    status: "queued",
-    resultUrl: null,
-    errorMessage: null,
-    prompt: null,
-    type: null,
-  });
-
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const poll = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/queue/${jobId}`);
-      if (!res.ok) return;
-
-      const data = (await res.json()) as JobState & { status: JobStatus };
-      setJobState(data);
-
-      if (data.status === "completed" || data.status === "failed") {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        if (data.status === "completed" && data.resultUrl && onComplete) {
-          onComplete(data.resultUrl);
-        }
-      }
-    } catch {
-      // Silently ignore poll failures — will retry on next interval
-    }
-  }, [jobId, onComplete]);
-
-  useEffect(() => {
-    poll(); // Immediate first poll
-    intervalRef.current = setInterval(poll, POLL_INTERVAL_MS);
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [poll]);
+export function QueueStatus({ jobState }: QueueStatusProps) {
 
   return (
     <div>

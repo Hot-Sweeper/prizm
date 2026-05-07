@@ -104,12 +104,20 @@ export function getModelInfo(modelId: string): ModelInfo | null {
   return IMAGE_MODELS[modelId] ?? VIDEO_MODELS[modelId] ?? null;
 }
 
-export function getProviderGroups(type: "image" | "video") {
-  const models = type === "image" ? IMAGE_MODELS : VIDEO_MODELS;
+function buildProviderGroups(models: Record<string, ModelInfo>) {
   const groups: Record<string, { id: string; info: ModelInfo }[]> = {};
   for (const [id, info] of Object.entries(models)) {
     const group = groups[info.provider] ?? (groups[info.provider] = []);
     group.push({ id, info });
   }
   return groups;
+}
+
+const PROVIDER_GROUPS = {
+  image: buildProviderGroups(IMAGE_MODELS),
+  video: buildProviderGroups(VIDEO_MODELS),
+} as const;
+
+export function getProviderGroups(type: "image" | "video") {
+  return PROVIDER_GROUPS[type];
 }

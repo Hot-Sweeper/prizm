@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Lock, CaretUp, Cpu } from "@phosphor-icons/react/dist/ssr";
 import { getProviderGroups, getModelInfo } from "@/lib/ai/models";
 import { ModelBrandIcon } from "./model-brand-icon";
@@ -22,16 +22,19 @@ export function ModelPicker({ type, value, onChange, userTier, isWhitelisted = f
   const containerRef = useRef<HTMLDivElement>(null);
   const groups = getProviderGroups(type);
   const activeModelInfo = value ? getModelInfo(value) : null;
+  const groupEntries = useMemo(() => Object.entries(groups), [groups]);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    if (!isOpen) return;
+
+    function handleClickOutside(e: PointerEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
+  }, [isOpen]);
 
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
@@ -82,7 +85,7 @@ export function ModelPicker({ type, value, onChange, userTier, isWhitelisted = f
             zIndex: 100,
           }}
         >
-          {Object.entries(groups).map(([provider, models]) => (
+          {groupEntries.map(([provider, models]) => (
             <div key={provider}>
               <div style={{
                 fontSize: "0.625rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
