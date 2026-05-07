@@ -5,8 +5,24 @@ import { NextResponse } from "next/server";
 
 const INFINITE_BALANCE = { image: 999_999, video: 999_999 };
 
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    }),
+  ]);
+}
+
 export async function GET() {
-  const session = await auth();
+  let session;
+  try {
+    session = await withTimeout(auth(), 5000, "auth");
+  } catch (error) {
+    console.error("[PRIZM][API] /api/credits/balance auth failed", error);
+    return NextResponse.json({ error: "Auth timeout" }, { status: 503 });
+  }
+
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -15,6 +31,13 @@ export async function GET() {
     return NextResponse.json(INFINITE_BALANCE);
   }
 
-  const balances = await getBalances(session.user.id);
+  let balances;
+  try {
+    balances = await withTimeout(getBalances(session.user.id), 5000, "getBalances");
+  } catch (error) {
+    console.error("[PRIZM][API] /api/credits/balance getBalances failed", error);
+    return NextResponse.json({ error: "Balance fetch timeout" }, { status: 503 });
+  }
+
   return NextResponse.json(balances);
 }
