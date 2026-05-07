@@ -257,6 +257,36 @@ function formatPricingLabel(model: CometApiModelRecord, estimatedCostUSD: number
     : `Est. $${estimatedCostUSD.toFixed(3)} / 5s`;
 }
 
+function titleCaseSegment(segment: string) {
+  if (!segment) return "";
+  if (/^\d/.test(segment)) return segment.toUpperCase();
+  return segment.charAt(0).toUpperCase() + segment.slice(1);
+}
+
+function prettifyModelId(modelId: string) {
+  const trailing = modelId.split("/").pop() ?? modelId;
+  return trailing
+    .replace(/[._]/g, "-")
+    .split("-")
+    .filter(Boolean)
+    .map(titleCaseSegment)
+    .join(" ");
+}
+
+function resolveDisplayName(model: CometApiModelRecord) {
+  const preferred = model.name?.trim();
+  if (preferred && preferred.toLowerCase() !== model.id.toLowerCase()) {
+    return preferred;
+  }
+
+  const latest = model.latest_model_name?.trim();
+  if (latest && latest.toLowerCase() !== model.id.toLowerCase()) {
+    return latest;
+  }
+
+  return prettifyModelId(model.id);
+}
+
 function normalizeRecord(model: CometApiModelRecord): LiveModelCatalogEntry | null {
   const endpoints = parseEndpoints(model.endpoints);
   const endpointTokens = buildEndpointTokens(endpoints);
@@ -276,7 +306,7 @@ function normalizeRecord(model: CometApiModelRecord): LiveModelCatalogEntry | nu
   const transport = inferTransport(model.id, type);
   const baseInfo: LiveModelCatalogEntry = {
     id: model.id,
-    displayName: model.name?.trim() || model.id,
+    displayName: resolveDisplayName(model),
     provider,
     providerCode,
     familyKey,
