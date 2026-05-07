@@ -58,7 +58,7 @@ let catalogCache:
 
 function parseEndpoints(value: CometApiModelRecord["endpoints"]) {
   if (!value) return [] as Array<{ key: string; path?: string; method?: string }>;
-  const parsed = typeof value === "string" ? safeJsonParse(value) : value;
+  const parsed = typeof value === "string" ? safeJsonParse(value) ?? value : value;
 
   if (Array.isArray(parsed)) {
     return parsed
@@ -111,6 +111,17 @@ function parseEndpoints(value: CometApiModelRecord["endpoints"]) {
   return [] as Array<{ key: string; path?: string; method?: string }>;
 }
 
+function buildEndpointTokens(endpoints: Array<{ key: string; path?: string; method?: string }>) {
+  const tokens = new Set<string>();
+  for (const endpoint of endpoints) {
+    const key = endpoint.key?.trim().toLowerCase();
+    const path = endpoint.path?.trim().toLowerCase();
+    if (key) tokens.add(key);
+    if (path) tokens.add(path);
+  }
+  return tokens;
+}
+
 function safeJsonParse(value: string) {
   try {
     return JSON.parse(value) as unknown;
@@ -119,7 +130,7 @@ function safeJsonParse(value: string) {
   }
 }
 
-function detectGenerationType(model: CometApiModelRecord): GenerationType | null {
+function detectGenerationType(model: CometApiModelRecord, endpointTokens: Set<string>): GenerationType | null {
   if (model.model_type === "image" || model.model_type === "video") {
     return model.model_type;
   }
@@ -132,15 +143,30 @@ function detectGenerationType(model: CometApiModelRecord): GenerationType | null
     return "video";
   }
 
+  // Fallback to endpoint aliases used by Comet when type/features are omitted.
+  if (endpointTokens.has("openai") || endpointTokens.has("image-generation") || endpointTokens.has("/v1/images/generations")) {
+    return "image";
+  }
+
+  if (endpointTokens.has("video-generation") || endpointTokens.has("/v1/videos")) {
+    return "video";
+  }
+
   return null;
 }
 
-function isSupportedRecord(model: CometApiModelRecord, type: GenerationType, endpointPaths: string[]) {
+function isSupportedRecord(type: GenerationType, endpointTokens: Set<string>) {
   if (type === "image") {
-    return endpointPaths.some((path) => path === "/v1/images/generations" || path === "/v1beta/models/{model}:generateContent");
+    // Currently implemented image execution supports OpenAI-style and Gemini-style transports.
+    return (
+      endpointTokens.has("openai") ||
+      endpointTokens.has("image-generation") ||
+      endpointTokens.has("/v1/images/generations") ||
+      endpointTokens.has("/v1beta/models/{model}:generatecontent")
+    );
   }
 
-  return endpointPaths.some((path) => path === "/v1/videos");
+  return endpointTokens.has("video-generation") || endpointTokens.has("/v1/videos");
 }
 
 function estimateCostUSD(model: CometApiModelRecord, type: GenerationType) {
@@ -199,14 +225,11 @@ function formatPricingLabel(model: CometApiModelRecord, estimatedCostUSD: number
 }
 
 function normalizeRecord(model: CometApiModelRecord): LiveModelCatalogEntry | null {
-  const type = detectGenerationType(model);
-  if (!type || model.upcoming) return null;
-
   const endpoints = parseEndpoints(model.endpoints);
-  const endpointPaths = endpoints
-    .map((endpoint) => endpoint?.path)
-    .filter((path): path is string => Boolean(path));
-  if (!isSupportedRecord(model, type, endpointPaths)) return null;
+  const endpointTokens = buildEndpointTokens(endpoints);
+  const type = detectGenerationType(model, endpointTokens);
+  if (!type || model.upcoming) return null;
+  if (!isSupportedRecord(type, endpointTokens)) return null;
 
   const estimatedCostUSD = estimateCostUSD(model, type);
   const provider = model.provider ?? "CometAPI";
