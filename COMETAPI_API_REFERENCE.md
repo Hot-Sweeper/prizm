@@ -1,0 +1,485 @@
+﻿# CometAPI API Reference (Live + Docs Indexed)
+
+- Generated: 2026-05-07 21:07:01 UTC
+- Source docs index: https://apidoc.cometapi.com/llms.txt
+- Base URL (OpenAI-compatible): https://api.cometapi.com/v1
+- Base URL (catalog + misc): https://api.cometapi.com
+
+## Verification Notes
+
+- Verified live: GET /api/models (public)
+- Verified live: GET /v1/models without API key returns 401 Unauthorized
+- COMETAPI_API_KEY in this environment: missing
+
+## Endpoint Tree (Discovered from Comet OpenAPI specs)
+
+- OpenAPI spec files discovered: 106
+- OpenAPI spec files parsed successfully: 106
+- OpenAPI spec files failed to parse: 0
+- Unique endpoints discovered: 97
+
+- /api
+  - /api/models
+    - GET /api/models
+  - /api/usage
+    - GET /api/usage/token
+- /bria
+  - /bria/{request_id}
+    - GET /bria/{request_id}
+  - /bria/text-to-image
+    - POST /bria/text-to-image
+  - /bria/text-to-vector
+    - POST /bria/text-to-vector
+- /flux
+  - /flux/v1
+    - POST /flux/v1/{model}
+    - GET /flux/v1/get_result
+- /grok
+  - /grok/v1
+    - GET /grok/v1/videos/{request_id}
+    - POST /grok/v1/videos/edits
+    - POST /grok/v1/videos/generations
+- /kling
+  - /kling/v1
+    - GET /kling/v1/{action}/{action2}/{task_id}
+    - POST /kling/v1/audio/text-to-audio
+    - POST /kling/v1/audio/tts
+    - POST /kling/v1/audio/video-to-audio
+    - POST /kling/v1/images/editing/expand
+    - POST /kling/v1/images/generations
+    - POST /kling/v1/images/kolors-virtual-try-on
+    - POST /kling/v1/videos/advanced-lip-sync
+    - POST /kling/v1/videos/avatar/image2video
+    - POST /kling/v1/videos/effects
+    - POST /kling/v1/videos/identify-face
+    - POST /kling/v1/videos/image2video
+    - POST /kling/v1/videos/image-recognize
+    - POST /kling/v1/videos/multi-elements
+    - POST /kling/v1/videos/multi-elements/add-selection
+    - POST /kling/v1/videos/multi-elements/clear-selection
+    - POST /kling/v1/videos/multi-elements/delete-selection
+    - POST /kling/v1/videos/multi-elements/init-selection
+    - POST /kling/v1/videos/multi-elements/preview-selection
+    - POST /kling/v1/videos/multi-image2video
+    - POST /kling/v1/videos/omni-video
+    - GET /kling/v1/videos/omni-video/{task_id}
+    - POST /kling/v1/videos/text2video
+    - POST /kling/v1/videos/video-extend
+- /mj
+  - /mj/submit
+    - POST /mj/submit/action
+    - POST /mj/submit/blend
+    - POST /mj/submit/describe
+    - POST /mj/submit/edits
+    - POST /mj/submit/imagine
+    - POST /mj/submit/modal
+    - POST /mj/submit/video
+  - /mj/task
+    - GET /mj/task/{id}/fetch
+    - POST /mj/task/list-by-condition
+- /replicate
+  - /replicate/v1
+    - POST /replicate/v1/models/{models}/predictions
+    - GET /replicate/v1/predictions/{id}
+- /runway
+  - /runway/feed
+    - POST /runway/feed
+  - /runway/pro
+    - POST /runway/pro/act_one
+    - POST /runway/pro/generate
+    - POST /runway/pro/video2video
+- /runwayml
+  - /runwayml/v1
+    - POST /runwayml/v1/character_performance
+    - POST /runwayml/v1/image_to_video
+    - GET /runwayml/v1/tasks/{id}
+    - POST /runwayml/v1/text_to_image
+    - POST /runwayml/v1/video_to_video
+    - POST /runwayml/v1/video_upscale
+- /suno
+  - /suno/act
+    - POST /suno/act/lyrics-mashup
+    - GET /suno/act/midi/{clip_id}
+    - GET /suno/act/mp4/{clip_id}
+    - POST /suno/act/phrase
+    - POST /suno/act/tags
+    - GET /suno/act/timing/{clip_id}
+    - POST /suno/act/vox/{clip_id}
+    - GET /suno/act/wav/{clip_id}
+  - /suno/custom-model
+    - POST /suno/custom-model
+  - /suno/fetch
+    - POST /suno/fetch
+    - GET /suno/fetch/{model_id}
+    - GET /suno/fetch/{task_id}
+  - /suno/persona
+    - POST /suno/persona/create
+    - POST /suno/persona/voice/create
+    - POST /suno/persona/voice/verify
+    - POST /suno/persona/voice/vox
+  - /suno/submit
+    - POST /suno/submit/concat
+    - POST /suno/submit/lyrics
+    - POST /suno/submit/music
+  - /suno/uploads
+    - POST /suno/uploads/audio-url
+- /user
+  - /user/quota
+    - GET /user/quota
+- /v1
+  - /v1/audio
+    - POST /v1/audio/speech
+    - POST /v1/audio/transcriptions
+    - POST /v1/audio/translations
+  - /v1/chat
+    - POST /v1/chat/completions
+  - /v1/dashboard
+    - GET /v1/dashboard/billing/subscription
+    - GET /v1/dashboard/billing/usage
+  - /v1/embeddings
+    - POST /v1/embeddings
+  - /v1/files
+    - GET /v1/files/retrieve
+  - /v1/images
+    - POST /v1/images/edits
+    - POST /v1/images/generations
+  - /v1/messages
+    - POST /v1/messages
+  - /v1/query
+    - GET /v1/query/video_generation
+  - /v1/responses
+    - POST /v1/responses
+  - /v1/video_generation
+    - POST /v1/video_generation
+  - /v1/videos
+    - POST /v1/videos
+    - GET /v1/videos/{id}
+    - GET /v1/videos/{video_id}
+    - GET /v1/videos/{video_id}/content
+    - POST /v1/videos/{video_id}/remix
+- /v1beta
+  - /v1beta/models
+    - POST /v1beta/models/{model}:{operator}
+    - POST /v1beta/models/{model}:generateContent
+
+## Live Model Catalog (GET /api/models)
+
+- Total models discovered: 314
+- Groups (owned_by): 314
+
+### (unknown) (314)
+- black-forest-labs/flux-1.1-pro
+- black-forest-labs/flux-1.1-pro-ultra
+- black-forest-labs/flux-2-dev
+- black-forest-labs/flux-2-flex
+- black-forest-labs/flux-2-max
+- black-forest-labs/flux-2-pro
+- black-forest-labs/flux-dev
+- black-forest-labs/flux-kontext-max
+- black-forest-labs/flux-kontext-pro
+- black-forest-labs/flux-pro
+- black-forest-labs/flux-schnell
+- bria/eraser
+- bria/expand-image
+- bria/generate-background
+- bria/genfill
+- bria/image-3.2
+- bria/increase-resolution
+- bria/remove-background
+- Claude Mythos  Preview
+- claude-haiku-4-5-20251001
+- claude-opus-4-1-20250805
+- claude-opus-4-20250514
+- claude-opus-4-5-20251101
+- claude-opus-4-6
+- claude-opus-4-7
+- claude-sonnet-4-20250514
+- claude-sonnet-4-5
+- claude-sonnet-4-6
+- claude-sonnet-5
+- dall-e-3
+- deepseek-chat
+- deepseek-ocr
+- deepseek-ocr-2
+- deepseek-r1-0528
+- deepseek-r1t2-chimera
+- deepseek-r2
+- deepseek-v3.2
+- deepseek-v3-1-250821
+- deepseek-v3-250324
+- deepseek-v4-flash
+- deepseek-v4-pro
+- doubao-seed-1-8-251228
+- doubao-seed-2-0-mini-260215
+- doubao-seedance-1-5-pro
+- doubao-seedance-2-0
+- doubao-seedream-4-0-250828
+- doubao-seedream-4-5-251128
+- doubao-seedream-5-0-260128
+- flux-2-flex
+- flux-2-max
+- flux-2-pro
+- flux-dev
+- flux-finetune
+- flux-kontext-max
+- flux-kontext-pro
+- flux-pro
+- flux-pro-1.0-canny
+- flux-pro-1.0-canny-finetuned
+- flux-pro-1.0-depth
+- flux-pro-1.0-depth-finetuned
+- flux-pro-1.0-fill
+- flux-pro-1.0-fill-finetuned
+- flux-pro-1.1
+- flux-pro-1.1-ultra
+- flux-pro-1.1-ultra-finetuned
+- flux-pro-finetuned
+- gemini-2.5-flash-deepsearch
+- gemini-2.5-flash-image
+- gemini-2.5-flash-lite-preview-09-2025
+- gemini-2.5-flash-preview-09-2025
+- gemini-2.5-pro
+- gemini-2.5-pro-deepsearch
+- gemini-3.1-flash
+- gemini-3.1-flash-image-preview
+- gemini-3.1-flash-lite-preview
+- gemini-3.1-pro-preview
+- gemini-3.5-pro
+- gemini-3-flash
+- gemini-3-pro-image
+- gemini-3-pro-preview
+- glm-4.5
+- glm-4.5-air
+- glm-4.5-airx
+- glm-4.5-flash
+- glm-4.5-x
+- glm-4.6
+- glm-4.7
+- glm-5
+- glm-5.1
+- glm-5-turbo
+- gpt-3.5-turbo-0125
+- gpt-4.1-2025-04-14
+- gpt-4.1-mini-2025-04-14
+- gpt-4.1-nano-2025-04-14
+- gpt-4o
+- gpt-4o-audio-preview
+- gpt-4o-image
+- gpt-4o-mini-2024-07-18
+- gpt-4o-mini-audio-preview
+- gpt-4o-mini-audio-preview-2024-12-17
+- gpt-4o-mini-realtime-preview
+- gpt-4o-mini-search-preview
+- gpt-4o-mini-tts
+- gpt-4o-realtime
+- gpt-4o-transcribe
+- gpt-5
+- gpt-5.1
+- gpt-5.1-chat-latest
+- gpt-5.1-codex
+- gpt-5.1-codex-max
+- gpt-5.2
+- gpt-5.2-chat-latest
+- gpt-5.2-codex
+- gpt-5.2-pro
+- gpt-5.3
+- gpt-5.3-chat-latest
+- gpt-5.3-codex
+- gpt-5.4
+- gpt-5.4-mini
+- gpt-5.4-nano
+- gpt-5.4-pro
+- gpt-5.5
+- gpt-5.5-all
+- gpt-5.5-pro
+- gpt-5-chat-latest
+- gpt-5-codex
+- gpt-5-mini
+- gpt-5-nano
+- gpt-6
+- gpt-audio-1.5
+- gpt-image-1
+- gpt-image-1.5
+- gpt-image-1-mini
+- gpt-image-2
+- gpt-image-2-all
+- gpt-oss-120b
+- gpt-oss-20b
+- gpt-realtime-1.5
+- gpt-realtime-mini
+- grok-4.20-0309-reasoning
+- grok-4.3
+- grok-4-0709
+- grok-4-1-fast-non-reasoning
+- grok-4-fast-non-reasoning
+- grok-code-fast-1
+- grok-imagine-video
+- hunyuan
+- Hunyuan3D-2
+- hunyuan-a13b
+- hunyuan-all
+- hunyuan-code
+- hunyuan-embedding
+- hunyuan-functioncall
+- hunyuan-large
+- hunyuan-large-vision
+- hunyuan-lite
+- hunyuan-pro
+- hunyuan-role
+- hunyuan-standard
+- hunyuan-standard-256K
+- hunyuan-t1-20250321
+- hunyuan-t1-20250403
+- hunyuan-t1-20250521
+- hunyuan-t1-20250529
+- hunyuan-t1-20250711
+- hunyuan-t1-latest
+- hunyuan-t1-vision
+- hunyuan-t1-vision-20250619
+- hunyuan-turbos-20250313
+- hunyuan-turbos-20250416
+- hunyuan-turbos-20250515
+- hunyuan-turbos-20250604
+- hunyuan-turbos-latest
+- hunyuan-turbos-longtext-128k-20250325
+- hunyuan-turbos-vision
+- hunyuan-turbos-vision-20250619
+- hunyuan-vision
+- ideogram-ai/ideogram-v2
+- ideogram-ai/ideogram-v2-turbo
+- kimi-k2.5
+- kimi-k2.6
+- kimi-k2-0905-preview
+- kling_advanced_lip_syn
+- kling_audio_text_to_audio
+- kling_audio_video_to_audio
+- kling_avatar_image2video
+- kling_effects
+- kling_extend
+- kling_identify_face
+- kling_image
+- kling_image_expand
+- kling_image_recognize
+- kling_multi_elements_submit
+- kling_multi_image2image
+- kling_tts
+- kling_video
+- kling_virtual_try_on
+- llama-4-maverick
+- llama-4-scout
+- mimo-v2.5
+- mimo-v2.5-pro
+- mimo-v2-omni
+- mimo-v2-pro
+- minimax_files_retrieve
+- minimax_minimax-hailuo-02
+- minimax_video-01
+- minimax-m2
+- minimax-m2.1
+- minimax-m2.5
+- minimax-m2.7
+- mj_fast_blend
+- mj_fast_custom_zoom
+- mj_fast_describe
+- mj_fast_edits
+- mj_fast_high_variation
+- mj_fast_imagine
+- mj_fast_inpaint
+- mj_fast_low_variation
+- mj_fast_modal
+- mj_fast_pan
+- mj_fast_pic_reader
+- mj_fast_prompt_analyzer
+- mj_fast_prompt_analyzer_extended
+- mj_fast_reroll
+- mj_fast_shorten
+- mj_fast_upload
+- mj_fast_upscale
+- mj_fast_upscale_creative
+- mj_fast_upscale_subtle
+- mj_fast_variation
+- mj_fast_video
+- mj_fast_zoom
+- mj_turbo_blend
+- mj_turbo_custom_zoom
+- mj_turbo_describe
+- mj_turbo_high_variation
+- mj_turbo_imagine
+- mj_turbo_inpaint
+- mj_turbo_low_variation
+- mj_turbo_modal
+- mj_turbo_pan
+- mj_turbo_pic_reader
+- mj_turbo_prompt_analyzer
+- mj_turbo_prompt_analyzer_extended
+- mj_turbo_reroll
+- mj_turbo_shorten
+- mj_turbo_upload
+- mj_turbo_upscale
+- mj_turbo_upscale_creative
+- mj_turbo_upscale_subtle
+- mj_turbo_variation
+- mj_turbo_zoom
+- o1
+- o1-2024-12-17
+- o1-mini
+- o1-mini-2024-09-12
+- o1-pro
+- o1-pro-2025-03-19
+- o3-2025-04-16
+- o3-mini-2025-01-31
+- o3-pro-2025-06-10
+- o4-mini-2025-04-16
+- omni-moderation-2024-09-26
+- omni-moderation-latest
+- qwen3.5-397b-a17b
+- qwen3.5-flash
+- qwen3.5-plus-2026-02-15
+- qwen3.6-max-preview
+- qwen3.6-plus
+- qwen3-14b
+- qwen3-235b-a22b
+- qwen3-30b-a3b
+- qwen3-32b
+- qwen3-8b
+- qwen3-coder
+- qwen3-coder-480b-a35b-instruct
+- qwen3-coder-plus
+- qwen3-coder-plus-2025-07-22
+- qwen3-max-2026-01-23
+- qwen3-vl-235b-a22b
+- qwen3-vl-32b
+- qwen-image
+- qwen-image-2
+- recraft-ai/recraft-v3
+- recraft-ai/recraft-v3-svg
+- runway_act_one
+- runway_video
+- runway_video2video
+- runwayml_character_performance
+- runwayml_image_to_video
+- runwayml_text_to_image
+- runwayml_upscale_video
+- runwayml_video_to_video
+- sora-2
+- stability-ai/sdxl
+- stability-ai/stable-diffusion
+- stability-ai/stable-diffusion-3
+- stability-ai/stable-diffusion-3.5-large
+- stability-ai/stable-diffusion-3.5-large-turbo
+- stability-ai/stable-diffusion-3.5-medium
+- text-embedding-3-large
+- text-embedding-3-small
+- text-embedding-ada-002
+- tts
+- tts-1
+- tts-1-1106
+- tts-1-hd
+- tts-1-hd-1106
+- veo3
+- veo3.1
+- veo3.1-pro
+- veo3-fast
+- veo3-pro
+- whisper-1
+
