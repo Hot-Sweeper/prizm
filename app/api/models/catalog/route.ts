@@ -1,11 +1,13 @@
 import { auth } from "@/auth";
+import { isLocalhostRequestUrl } from "@/lib/credits/whitelist";
 import { getLiveModelCatalog } from "@/lib/ai/live-model-catalog";
 import { getModelCapabilityProfile } from "@/lib/ai/model-capabilities";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const isLocalDev = isLocalhostRequestUrl(request.url);
   const session = await auth();
-  if (!session?.user?.id) {
+  if (!session?.user?.id && !isLocalDev) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

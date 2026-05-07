@@ -26,6 +26,12 @@ export async function GET(request: Request) {
   }
 
   if (!session?.user?.id) {
+    if (isLocalDev) {
+      const localUrl = new URL(request.url);
+      const localPageParam = Number(localUrl.searchParams.get("page") ?? "1");
+      const localPage = Number.isFinite(localPageParam) && localPageParam > 0 ? Math.floor(localPageParam) : 1;
+      return NextResponse.json({ jobs: [], page: localPage, localFallback: true });
+    }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

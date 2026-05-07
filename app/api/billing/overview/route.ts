@@ -14,15 +14,32 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 }
 
 export async function GET(request: Request) {
+  const isLocalDev = isWhitelistedForRequest(undefined, request.url);
   let session;
   try {
     session = await withTimeout(auth(), 5000, "auth");
   } catch (error) {
     console.error("[PRIZM][API] /api/billing/overview auth failed", error);
+    if (isLocalDev) {
+      return NextResponse.json({
+        currentTier: "max",
+        isWhitelisted: true,
+        status: "active",
+        balances: { image: 999_999, video: 999_999 },
+      });
+    }
     return NextResponse.json({ error: "Auth timeout" }, { status: 503 });
   }
 
   if (!session?.user?.id) {
+    if (isLocalDev) {
+      return NextResponse.json({
+        currentTier: "max",
+        isWhitelisted: true,
+        status: "active",
+        balances: { image: 999_999, video: 999_999 },
+      });
+    }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
