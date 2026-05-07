@@ -571,11 +571,8 @@ export function GenerationForm({
       )}
 
       {/* Bottom Tool Strip */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", position: "relative", flexWrap: "wrap" }}>
-        
-        {/* Left Toolbar */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          {/* Upload button */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", position: "relative", flexWrap: "wrap" }}>
+        {/* Upload button */}
           <button
             type="button"
             onClick={() => {
@@ -590,17 +587,18 @@ export function GenerationForm({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "32px",
-              height: "32px",
-              borderRadius: "0.5rem",
-              border: "1px solid rgba(255,255,255,0.1)",
-              background: attachedImages.length > 0 ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.04)",
+              width: "38px",
+              height: "38px",
+              borderRadius: "999px",
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: attachedImages.length > 0 ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.05)",
               color: attachedImages.length > 0 ? VL : "rgba(255,255,255,0.45)",
               cursor: supportsReferenceImages ? "pointer" : "not-allowed",
               opacity: supportsReferenceImages ? 1 : 0.45,
               transition: "all 0.15s",
               padding: 0,
               position: "relative",
+              flexShrink: 0,
             }}
           >
             <Paperclip size={15} aria-hidden />
@@ -636,9 +634,11 @@ export function GenerationForm({
             style={{
               display: "flex",
               gap: "4px",
-              background: "rgba(255,255,255,0.04)",
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
               borderRadius: "999px",
               padding: "4px",
+              flexShrink: 0,
             }}
           >
             {(["image", "video"] as GenerationType[]).map((t) => (
@@ -650,9 +650,9 @@ export function GenerationForm({
                 onClick={() => handleTypeChange(t)}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-                  padding: "6px 12px",
+                  padding: "5px 12px",
                   borderRadius: "999px",
-                  fontSize: "0.75rem", fontWeight: 600,
+                  fontSize: "0.8rem", fontWeight: 600,
                   border: "none",
                   cursor: "pointer",
                   transition: "background 0.1s, color 0.1s",
@@ -679,7 +679,9 @@ export function GenerationForm({
             settings={settings}
             onChange={handleSettingChange}
           />
-        </div>
+
+          {/* Spacer pushes Generate to the right */}
+          <div style={{ flex: 1 }} />
 
         {/* Generate Button */}
         <button
@@ -697,6 +699,7 @@ export function GenerationForm({
             fontSize: "0.875rem", fontWeight: 700,
             cursor: canSubmit ? "pointer" : "not-allowed",
             boxShadow: canSubmit ? `0 0 24px ${V}66` : "none",
+            flexShrink: 0,
           }}
         >
           {isSubmitting ? (

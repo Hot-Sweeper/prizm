@@ -354,7 +354,7 @@ export function GenerateClient({
         </div>
 
         {/* Floating Chat/Prompt Bar */}
-        <div style={{ position: "absolute", bottom: "2rem", left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: "800px", zIndex: 10 }}>
+        <div style={{ position: "absolute", bottom: "2rem", left: "50%", transform: "translateX(-50%)", width: "calc(100% - 4rem)", maxWidth: "1000px", zIndex: 10 }}>
           <div style={{ background: "rgba(10,10,10,0.85)", backdropFilter: "blur(24px) saturate(200%)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "2rem", padding: "1.5rem", boxShadow: "0 20px 40px rgba(0,0,0,0.6)" }}>
             <GenerationForm
               userTier={userTier}
