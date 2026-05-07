@@ -23,6 +23,7 @@ const STORAGE_KEY = "prizm.debug.monitor";
 const HEARTBEAT_INTERVAL_MS = 1000;
 const JANK_THRESHOLD_MS = 500;
 const REQUEST_WARN_MS = 2000;
+const MONITOR_VERSION = "v2";
 
 function nowIso() {
   return new Date().toISOString();
@@ -281,21 +282,22 @@ export function DebugMonitor({ activeJobCount, historyCount }: DebugMonitorProps
         onClick={() => setEnabled(true)}
         style={{
           position: "fixed",
-          right: "1rem",
-          bottom: "1rem",
-          zIndex: 2000,
+          left: "1rem",
+          top: "1rem",
+          zIndex: 2147483647,
           padding: "0.5rem 0.75rem",
           borderRadius: "0.75rem",
-          border: "1px solid rgba(255,255,255,0.2)",
-          background: "rgba(15,15,15,0.85)",
-          color: "#fff",
+          border: "1px solid #f472b6",
+          background: "rgba(33, 8, 24, 0.95)",
+          color: "#fdf2f8",
           fontSize: "0.75rem",
-          fontWeight: 700,
-          letterSpacing: "0.04em",
+          fontWeight: 800,
+          letterSpacing: "0.06em",
           cursor: "pointer",
+          boxShadow: "0 8px 22px rgba(236,72,153,0.45)",
         }}
       >
-        Open Debug Monitor
+        DEBUG MONITOR {MONITOR_VERSION}
       </button>
     );
   }
@@ -305,11 +307,11 @@ export function DebugMonitor({ activeJobCount, historyCount }: DebugMonitorProps
       aria-label="Debug monitor"
       style={{
         position: "fixed",
-        right: "1rem",
-        bottom: "1rem",
+        left: "1rem",
+        top: "1rem",
         width: open ? "min(92vw, 460px)" : "auto",
         maxHeight: open ? "70vh" : "none",
-        zIndex: 2000,
+        zIndex: 2147483647,
         border: "1px solid rgba(255,255,255,0.18)",
         borderRadius: "0.9rem",
         background: "rgba(12,12,12,0.95)",
