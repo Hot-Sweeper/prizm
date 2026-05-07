@@ -10,12 +10,29 @@ interface SettingsPillsProps {
   onChange: (key: string, value: string | number | boolean) => void;
 }
 
-// Show a tiny rectangle matching the aspect ratio
-function AspectPreview({ ratio, color }: { ratio: string; color: string }) {
+// Matches "1:1", "16:9", "1024x1024", "1792x1024" etc.
+const looksLikeRatio = (v: string) => /^\d+[x:]\d+$/.test(v);
+
+// Returns true if this field should render shape previews
+function isShapeField(field: ModelSettingField): boolean {
+  if (field.key === "aspectRatio") return true;
+  // size field when options contain ratio-like values (colon or "x" separated)
+  if (field.key === "size" && field.options?.some((opt) => looksLikeRatio(opt.value))) return true;
+  return false;
+}
+
+// Draws a proportional solid rectangle for the given ratio/resolution string
+function AspectPreview({
+  ratio,
+  active,
+}: {
+  ratio: string;
+  active: boolean;
+}) {
   const parts = ratio.replace("x", ":").split(":").map(Number);
   const w = parts[0] || 1;
   const h = parts[1] || 1;
-  const maxDim = 12;
+  const maxDim = 13;
   const isLandscape = w >= h;
   const calcW = isLandscape ? maxDim : Math.max(4, Math.round((w / h) * maxDim));
   const calcH = isLandscape ? Math.max(4, Math.round((h / w) * maxDim)) : maxDim;
@@ -26,8 +43,8 @@ function AspectPreview({ ratio, color }: { ratio: string; color: string }) {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        width: "16px",
-        height: "16px",
+        width: "18px",
+        height: "18px",
         flexShrink: 0,
       }}
     >
@@ -36,7 +53,7 @@ function AspectPreview({ ratio, color }: { ratio: string; color: string }) {
           display: "block",
           width: `${calcW}px`,
           height: `${calcH}px`,
-          border: `1.5px solid ${color}`,
+          background: active ? "var(--color-secondary)" : "rgba(255,255,255,0.55)",
           borderRadius: "2px",
         }}
       />
@@ -56,8 +73,7 @@ function PillDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const activeOption = field.options?.find((opt) => opt.value === String(value));
-  const isAspectRatio = field.key === "aspectRatio" || field.key === "size" && field.options?.some((opt) => opt.value.includes(":"));
-  const activeColor = "rgba(255,255,255,0.5)";
+  const showShape = isShapeField(field);
   const selectedColor = "var(--color-secondary)";
 
   useEffect(() => {
@@ -69,8 +85,6 @@ function PillDropdown({
     return () => document.removeEventListener("pointerdown", close);
   }, [isOpen]);
 
-  const looksLikeRatio = (v: string) => /^\d+[x:]\d+$/.test(v);
-
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button
@@ -80,21 +94,22 @@ function PillDropdown({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "6px",
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.07)",
+          gap: "7px",
+          background: "rgba(255,255,255,0.05)",
+          border: "1px solid rgba(255,255,255,0.08)",
           borderRadius: "999px",
-          padding: "8px 12px",
+          padding: "9px 14px",
           color: "#fff",
           cursor: "pointer",
-          fontSize: "0.75rem",
+          fontSize: "0.8rem",
           fontWeight: 600,
           whiteSpace: "nowrap",
+          lineHeight: 1,
         }}
       >
-        {isAspectRatio && looksLikeRatio(String(value)) ? (
-          <AspectPreview ratio={String(value)} color={activeColor} />
-        ) : null}
+        {showShape && looksLikeRatio(String(value)) && (
+          <AspectPreview ratio={String(value)} active={false} />
+        )}
         <span>{activeOption?.label ?? String(value)}</span>
         <CaretUp
           size={11}
@@ -125,11 +140,12 @@ function PillDropdown({
             boxShadow: "0 10px 40px rgba(0,0,0,0.8)",
             zIndex: 110,
             backdropFilter: "blur(20px)",
-            minWidth: "140px",
+            minWidth: "160px",
           }}
         >
           {field.options?.map((opt) => {
             const selected = String(value) === opt.value;
+            const optHasShape = showShape && looksLikeRatio(opt.value);
             return (
               <button
                 key={opt.value}
@@ -142,13 +158,13 @@ function PillDropdown({
                 }}
                 style={{
                   width: "100%",
-                  padding: "6px 12px",
+                  padding: "7px 12px",
                   borderRadius: "0.5rem",
                   background: selected ? "rgba(124,58,237,0.12)" : "transparent",
                   color: selected ? selectedColor : "#fff",
                   border: selected ? "1px solid rgba(167,139,250,0.55)" : "1px solid transparent",
                   cursor: "pointer",
-                  fontSize: "0.75rem",
+                  fontSize: "0.8rem",
                   fontWeight: 600,
                   display: "flex",
                   alignItems: "center",
@@ -157,19 +173,17 @@ function PillDropdown({
                   textAlign: "left",
                 }}
                 onMouseEnter={(e) => {
-                  if (!selected) e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                  if (!selected) e.currentTarget.style.background = "rgba(255,255,255,0.05)";
                 }}
                 onMouseLeave={(e) => {
                   if (!selected) e.currentTarget.style.background = "transparent";
                 }}
               >
-                {isAspectRatio && looksLikeRatio(opt.value) ? (
-                  <AspectPreview
-                    ratio={opt.value}
-                    color={selected ? selectedColor : "rgba(255,255,255,0.5)"}
-                  />
+                {optHasShape ? (
+                  <AspectPreview ratio={opt.value} active={selected} />
                 ) : (
-                  <span style={{ width: "16px", display: "inline-block" }} />
+                  // Reserve space so text aligns when some rows have shapes and some don't
+                  showShape && <span style={{ width: "18px", display: "inline-block" }} />
                 )}
                 {opt.label}
               </button>
@@ -184,7 +198,6 @@ function PillDropdown({
 export function SettingsPills({ profile, settings, onChange }: SettingsPillsProps) {
   if (!profile || profile.fields.length === 0) return null;
 
-  // Only show select fields as pills (not toggle or number — those stay in an overflow)
   const pillFields = profile.fields.filter((field) => field.input === "select");
 
   if (pillFields.length === 0) return null;
