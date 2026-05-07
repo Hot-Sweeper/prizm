@@ -1,10 +1,13 @@
-import { auth } from "@/auth";
+import { NextResponse, type NextRequest } from "next/server";
 
-// Next.js 16 uses "proxy" instead of "middleware" — must be a named const export
-export const proxy = auth;
+// Keep proxy lightweight while debugging request stalls.
+// Auth guards run at route/page level.
+export function proxy(_request: NextRequest) {
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|login|register|$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|$).*)",
   ],
 };

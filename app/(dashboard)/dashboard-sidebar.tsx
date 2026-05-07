@@ -42,6 +42,7 @@ export function DashboardSidebar() {
               <li key={href} style={{ width: "100%", display: "flex", justifyContent: "center" }}>
                 <Link
                   href={href}
+                  prefetch={false}
                   aria-label={label}
                   title={label}
                   style={{
