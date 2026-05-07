@@ -4,8 +4,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 const queueStatusesSchema = z.object({
-  jobIds: z.array(z.string().uuid()).min(1).max(50),
+  jobIds: z.array(z.string().min(1)).min(1).max(50),
 });
+
+const uuidSchema = z.string().uuid();
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -22,7 +24,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const jobs = await getJobsByIdsForUser(session.user.id, parsed.data.jobIds).catch(
+  const validJobIds: string[] = [];
+  const invalidJobIds: string[] = [];
+
+  for (const jobId of parsed.data.jobIds) {
+    if (uuidSchema.safeParse(jobId).success) {
+      validJobIds.push(jobId);
+    } else {
+      invalidJobIds.push(jobId);
+    }
+  }
+
+  if (validJobIds.length === 0) {
+    return NextResponse.json({ jobs: [], invalidJobIds });
+  }
+
+  const jobs = await getJobsByIdsForUser(session.user.id, validJobIds).catch(
     () => []
   );
 
@@ -39,5 +56,6 @@ export async function POST(request: Request) {
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     })),
+    invalidJobIds,
   });
 }

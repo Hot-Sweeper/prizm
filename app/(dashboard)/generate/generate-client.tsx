@@ -60,6 +60,13 @@ interface GenerateClientProps {
 const VL = "var(--color-secondary)";
 const FAST_POLL_MS = 2000;
 const SLOW_POLL_MS = 4500;
+const FETCH_TIMEOUT_MS = 8000;
+
+function createTimeoutSignal(timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return { signal: controller.signal, clear: () => clearTimeout(timeoutId) };
+}
 
 export function GenerateClient({
   userTier,
@@ -120,6 +127,7 @@ export function GenerateClient({
   );
 
   function handleJobCreated(jobId: string, prompt: string, type: string, modelId: string) {
+    console.debug("[PRIZM][queue] job created", { jobId, type, modelId });
     setActiveJobIds((prev) => [jobId, ...prev]);
     setLatestResultUrl(null);
     const newJob: GenerationJob = {
@@ -140,16 +148,40 @@ export function GenerateClient({
     if (activeJobIds.length === 0) return;
 
     try {
+      const timeout = createTimeoutSignal(FETCH_TIMEOUT_MS);
       const res = await fetch("/api/queue/statuses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
+        signal: timeout.signal,
         body: JSON.stringify({ jobIds: activeJobIds }),
       });
+      timeout.clear();
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        const errorBody = await res.text().catch(() => "");
+        console.error("[PRIZM][queue] batch poll failed", {
+          status: res.status,
+          statusText: res.statusText,
+          activeJobIds,
+          errorBody,
+        });
+        return;
+      }
 
-      const data = (await res.json()) as { jobs: QueueJobPayload[] };
+      const data = (await res.json()) as {
+        jobs: QueueJobPayload[];
+        invalidJobIds?: string[];
+      };
+
+      if (Array.isArray(data.invalidJobIds) && data.invalidJobIds.length > 0) {
+        console.warn("[PRIZM][queue] removing invalid job IDs from active queue", {
+          invalidJobIds: data.invalidJobIds,
+        });
+        const invalidSet = new Set(data.invalidJobIds);
+        setActiveJobIds((prev) => prev.filter((id) => !invalidSet.has(id)));
+      }
+
       if (!Array.isArray(data.jobs) || data.jobs.length === 0) return;
 
       const completedOrFailedIds = new Set<string>();
@@ -165,6 +197,10 @@ export function GenerateClient({
       }
 
       if (newestCompleted?.resultUrl) {
+        console.debug("[PRIZM][queue] newest completed job", {
+          jobId: newestCompleted.id,
+          type: newestCompleted.type,
+        });
         setLatestResultUrl(newestCompleted.resultUrl);
         if (newestCompleted.type) setLatestResultType(newestCompleted.type);
       }
@@ -187,9 +223,13 @@ export function GenerateClient({
       });
 
       if (completedOrFailedIds.size > 0) {
+        console.debug("[PRIZM][queue] removing finished jobs from active list", {
+          finishedCount: completedOrFailedIds.size,
+        });
         setActiveJobIds((prev) => prev.filter((id) => !completedOrFailedIds.has(id)));
       }
-    } catch {
+    } catch (error) {
+      console.error("[PRIZM][queue] poll threw error", error);
       // Keep polling loop resilient to transient network failures.
     }
   }, [activeJobIds]);
@@ -197,13 +237,24 @@ export function GenerateClient({
   useEffect(() => {
     if (activeJobIds.length === 0) return;
 
+    const initialKickoff = setTimeout(() => {
+      void pollQueueStatuses();
+    }, 50);
+
     const hasProcessing = activeJobs.some((job) => job.status === "processing");
     const intervalMs = hasProcessing ? FAST_POLL_MS : SLOW_POLL_MS;
+    console.debug("[PRIZM][queue] poll loop started", {
+      activeJobs: activeJobIds.length,
+      intervalMs,
+    });
     const intervalId = setInterval(() => {
       void pollQueueStatuses();
     }, intervalMs);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      clearTimeout(initialKickoff);
+      clearInterval(intervalId);
+    };
   }, [activeJobIds.length, activeJobs, pollQueueStatuses]);
 
   return (
@@ -251,6 +302,11 @@ export function GenerateClient({
               isWhitelisted={isWhitelisted}
               onJobCreated={(jobId, prompt, type, modelId) => handleJobCreated(jobId, prompt, type, modelId)}
               onDirectResult={(res, prompt, type) => {
+                console.debug("[PRIZM][generate] direct result received", {
+                  jobId: res.jobId,
+                  type,
+                  model: res.apiInfo.model,
+                });
                 setLatestResultUrl(res.url);
                 setLatestResultType(res.type);
                 const newJob: GenerationJob = {

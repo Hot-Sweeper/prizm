@@ -185,6 +185,12 @@ export function GenerationForm({
 
     setIsSubmitting(true);
     setError(null);
+    console.debug("[PRIZM][generate] submit started", {
+      type,
+      modelId,
+      promptLength: prompt.trim().length,
+      attachedImages: attachedImages.length,
+    });
 
     try {
       let imageData: string[] | undefined;
@@ -215,8 +221,16 @@ export function GenerationForm({
       });
 
       const data = await response.json();
+      console.debug("[PRIZM][generate] response received", {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        bodyStatus: data?.status,
+        jobId: data?.jobId,
+      });
 
       if (!response.ok) {
+        console.error("[PRIZM][generate] request failed", data);
         setError(data.error ?? "Generation failed. Please try again.");
         return;
       }
@@ -231,9 +245,15 @@ export function GenerationForm({
 
       // Queued generation: normal pipeline
       onJobCreated(data.jobId as string, prompt.trim(), type, modelId);
+      console.debug("[PRIZM][generate] queued job created", {
+        jobId: data.jobId,
+        type,
+        modelId,
+      });
       setPrompt("");
       clearAttachedImages();
-    } catch {
+    } catch (error) {
+      console.error("[PRIZM][generate] network/client exception", error);
       setError("Network error. Please check your connection and try again.");
     } finally {
       setIsSubmitting(false);
