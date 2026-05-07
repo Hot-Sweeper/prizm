@@ -5,6 +5,7 @@ import { GenerationForm } from "@/components/features/generation/generation-form
 import { QueueStatus } from "@/components/features/generation/queue-status";
 import { HistoryCard } from "@/components/features/generation/history-card";
 import { CreditDisplay } from "@/components/features/generation/credit-display";
+import { DebugMonitor } from "@/components/features/generation/debug-monitor";
 import { Sparkle as Sparkles, Image as ImageIcon, FilmSlate } from "@phosphor-icons/react/dist/ssr";
 import { getModelInfo } from "@/lib/ai/models";
 import { ModelBrandIcon } from "@/components/features/generation/model-brand-icon";
@@ -448,6 +449,8 @@ export function GenerateClient({
           </div>
         </div>
       </div>
+
+      <DebugMonitor activeJobCount={activeJobIds.length} historyCount={history.length} />
     </div>
   );
 }
