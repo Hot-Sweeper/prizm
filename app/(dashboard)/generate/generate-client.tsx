@@ -74,6 +74,9 @@ export function GenerateClient({
   isWhitelisted = false,
   initialHistory,
 }: GenerateClientProps) {
+  const [resolvedImageBalance, setResolvedImageBalance] = useState(imageBalance);
+  const [resolvedVideoBalance, setResolvedVideoBalance] = useState(videoBalance);
+  const [balancesLoading, setBalancesLoading] = useState(true);
   const [activeJobIds, setActiveJobIds] = useState<string[]>([]);
   const [latestResultUrl, setLatestResultUrl] = useState<string | null>(null);
   const [latestResultType, setLatestResultType] = useState<string | null>(null);
@@ -85,6 +88,45 @@ export function GenerateClient({
       timestamp: new Date().toISOString(),
     });
   }, [initialHistory.length]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapBalances() {
+      const timeout = createTimeoutSignal(FETCH_TIMEOUT_MS);
+      try {
+        const response = await fetch("/api/credits/balance", {
+          cache: "no-store",
+          credentials: "include",
+          signal: timeout.signal,
+        });
+
+        if (!response.ok) {
+          console.error("[PRIZM][bootstrap] balance fetch failed", response.status);
+          return;
+        }
+
+        const data = (await response.json()) as { image?: number; video?: number };
+        if (cancelled) return;
+
+        if (typeof data.image === "number") setResolvedImageBalance(data.image);
+        if (typeof data.video === "number") setResolvedVideoBalance(data.video);
+      } catch (error) {
+        if (!cancelled) {
+          console.error("[PRIZM][bootstrap] balance fetch threw", error);
+        }
+      } finally {
+        timeout.clear();
+        if (!cancelled) setBalancesLoading(false);
+      }
+    }
+
+    void bootstrapBalances();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const jobsById = useMemo(() => {
     const map = new Map<string, GenerationJob>();
@@ -330,8 +372,8 @@ export function GenerateClient({
           <div style={{ background: "rgba(10,10,10,0.85)", backdropFilter: "blur(24px) saturate(200%)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "2rem", padding: "1.5rem", boxShadow: "0 20px 40px rgba(0,0,0,0.6)" }}>
             <GenerationForm
               userTier={userTier}
-              imageBalance={imageBalance}
-              videoBalance={videoBalance}
+              imageBalance={balancesLoading ? 999_999 : resolvedImageBalance}
+              videoBalance={balancesLoading ? 999_999 : resolvedVideoBalance}
               isWhitelisted={isWhitelisted}
               onJobCreated={(jobId, prompt, type, modelId) => handleJobCreated(jobId, prompt, type, modelId)}
               onDirectResult={(res, prompt, type) => {
@@ -365,7 +407,7 @@ export function GenerateClient({
       <div style={{ width: "380px", flexShrink: 0, background: "rgba(3,3,3,0.9)", borderLeft: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", zIndex: 20 }}>
         <div style={{ padding: "1.5rem", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: "1rem" }}>
           <h3 className="font-display" style={{ fontSize: "1.25rem", color: "#fff", letterSpacing: "0.05em" }}>TOOLS &amp; CREDITS</h3>
-          <CreditDisplay imageBalance={imageBalance} videoBalance={videoBalance} />
+          <CreditDisplay imageBalance={resolvedImageBalance} videoBalance={resolvedVideoBalance} />
         </div>
         
         <div style={{ padding: "1.5rem 1.5rem 0.5rem 1.5rem" }}>
