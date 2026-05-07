@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { getBalances } from "@/lib/credits";
-import { isWhitelistedEmail } from "@/lib/credits/whitelist";
+import { isWhitelistedForRequest } from "@/lib/credits/whitelist";
 import { NextResponse } from "next/server";
 
 const INFINITE_BALANCE = { image: 999_999, video: 999_999 };
@@ -14,7 +14,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   ]);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   let session;
   try {
     session = await withTimeout(auth(), 5000, "auth");
@@ -27,7 +27,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (isWhitelistedEmail(session.user.email)) {
+  if (isWhitelistedForRequest(session.user.email, request.url)) {
     return NextResponse.json(INFINITE_BALANCE);
   }
 

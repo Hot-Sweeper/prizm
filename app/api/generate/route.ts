@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { generationJobs } from "@/lib/db/schema";
 import { deductCredits } from "@/lib/credits";
-import { isWhitelistedEmail } from "@/lib/credits/whitelist";
+import { isWhitelistedForRequest } from "@/lib/credits/whitelist";
 import { enqueueGeneration } from "@/lib/queue/enqueue";
 import { cometClient } from "@/lib/ai/comet-client";
 import { getModelInfo } from "@/lib/ai/models";
@@ -252,7 +252,7 @@ export async function POST(request: Request) {
   };
 
   // Whitelisted users: direct CometAPI call — no queue, no credits
-  if (isWhitelistedEmail(session.user.email)) {
+  if (isWhitelistedForRequest(session.user.email, request.url)) {
     try {
       return await directGenerate(session.user.id, type, modelId, prompt, dbSettings, runtimeSettings);
     } catch (err) {
