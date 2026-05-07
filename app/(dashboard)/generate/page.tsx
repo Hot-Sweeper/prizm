@@ -36,6 +36,7 @@ export default async function GeneratePage() {
 
   return (
     <main id="maincontent" tabIndex={-1} style={{ height: "100%", overflow: "hidden", display: "flex" }}>
+      {/* PRIZM-BUILD: {new Date().toISOString()} */}
       <GenerateClient
         userTier={tier}
         imageBalance={balances.image}

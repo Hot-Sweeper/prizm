@@ -14,8 +14,8 @@ type DebugEvent = {
 };
 
 interface DebugMonitorProps {
-  activeJobCount: number;
-  historyCount: number;
+  activeJobCount?: number;
+  historyCount?: number;
 }
 
 const MAX_EVENTS = 200;
@@ -44,7 +44,7 @@ function isMonitorEnabledFromUrl() {
   return params.get("debugMonitor") === "1";
 }
 
-export function DebugMonitor({ activeJobCount, historyCount }: DebugMonitorProps) {
+export function DebugMonitor({ activeJobCount = 0, historyCount = 0 }: DebugMonitorProps) {
   const [enabled, setEnabled] = useState(false);
   const [open, setOpen] = useState(true);
   const [events, setEvents] = useState<DebugEvent[]>([]);
