@@ -20,12 +20,16 @@ export default async function GeneratePage() {
 
   const whitelisted = isWhitelistedEmail(session.user.email);
 
+  // Race DB calls against a timeout so a hung DB connection never blocks SSR.
+  const withTimeout = <T>(p: Promise<T>, fallback: T, ms = 5000): Promise<T> =>
+    Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))]);
+
   const [balances, subscription, recentJobs] = await Promise.all([
     whitelisted
       ? INFINITE_BALANCE
-      : getBalances(session.user.id).catch(() => ({ image: 0, video: 0 })),
-    getSubscriptionByUserId(session.user.id).catch(() => null),
-    getUserJobs(session.user.id, 1).catch(() => []), // fetch last 20 jobs for library sidebar
+      : withTimeout(getBalances(session.user.id).catch(() => ({ image: 0, video: 0 })), { image: 0, video: 0 }),
+    withTimeout(getSubscriptionByUserId(session.user.id).catch(() => null), null),
+    withTimeout(getUserJobs(session.user.id, 1).catch(() => []), []),
   ]);
 
   const tier = whitelisted ? "max" : (subscription?.tier ?? "free");
