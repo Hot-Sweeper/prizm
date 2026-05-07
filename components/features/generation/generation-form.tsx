@@ -589,6 +589,7 @@ export function GenerationForm({
               justifyContent: "center",
               width: "38px",
               height: "38px",
+              boxSizing: "border-box",
               borderRadius: "999px",
               border: "1px solid rgba(255,255,255,0.08)",
               background: attachedImages.length > 0 ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.05)",
@@ -634,6 +635,9 @@ export function GenerationForm({
             style={{
               display: "flex",
               gap: "4px",
+              alignItems: "center",
+              height: "38px",
+              boxSizing: "border-box",
               background: "rgba(255,255,255,0.05)",
               border: "1px solid rgba(255,255,255,0.08)",
               borderRadius: "999px",

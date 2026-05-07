@@ -92,13 +92,15 @@ function PillDropdown({
         onClick={() => setIsOpen((o) => !o)}
         aria-label={`${field.label}: ${activeOption?.label ?? String(value)}`}
         style={{
+          height: "38px",
+          boxSizing: "border-box",
           display: "flex",
           alignItems: "center",
           gap: "7px",
           background: "rgba(255,255,255,0.05)",
           border: "1px solid rgba(255,255,255,0.08)",
           borderRadius: "999px",
-          padding: "9px 14px",
+          padding: "0 14px",
           color: "#fff",
           cursor: "pointer",
           fontSize: "0.8rem",

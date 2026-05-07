@@ -50,10 +50,12 @@ export function ModelPicker({ models, value, onChange, userTier, isWhitelisted =
         aria-expanded={isOpen}
         style={{
           display: "flex", alignItems: "center", gap: "8px",
+          height: "38px",
+          boxSizing: "border-box",
           background: "rgba(255,255,255,0.05)",
           border: "1px solid rgba(255,255,255,0.08)",
           borderRadius: "999px",
-          padding: "9px 14px",
+          padding: "0 14px",
           color: "#fff",
           cursor: "pointer",
           transition: "background 0.15s",
