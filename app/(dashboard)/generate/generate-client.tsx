@@ -83,13 +83,6 @@ export function GenerateClient({
   const [history, setHistory] = useState<GenerationJob[]>(initialHistory);
 
   useEffect(() => {
-    console.warn("[PRIZM][debug] generate client logger active", {
-      initialHistoryCount: initialHistory.length,
-      timestamp: new Date().toISOString(),
-    });
-  }, [initialHistory.length]);
-
-  useEffect(() => {
     let cancelled = false;
 
     async function bootstrapBalances() {
@@ -102,7 +95,6 @@ export function GenerateClient({
         });
 
         if (!response.ok) {
-          console.error("[PRIZM][bootstrap] balance fetch failed", response.status);
           return;
         }
 
@@ -112,8 +104,8 @@ export function GenerateClient({
         if (typeof data.image === "number") setResolvedImageBalance(data.image);
         if (typeof data.video === "number") setResolvedVideoBalance(data.video);
       } catch (error) {
-        if (!cancelled) {
-          console.error("[PRIZM][bootstrap] balance fetch threw", error);
+        if (!cancelled && !(error instanceof DOMException && error.name === "AbortError")) {
+          console.error("balance bootstrap failed", error);
         }
       } finally {
         timeout.clear();
@@ -175,7 +167,6 @@ export function GenerateClient({
   );
 
   function handleJobCreated(jobId: string, prompt: string, type: string, modelId: string) {
-    console.info("[PRIZM][queue] job created", { jobId, type, modelId });
     setActiveJobIds((prev) => [jobId, ...prev]);
     setLatestResultUrl(null);
     const newJob: GenerationJob = {
@@ -257,10 +248,6 @@ export function GenerateClient({
       }
 
       if (newestCompleted?.resultUrl) {
-        console.info("[PRIZM][queue] job completed", {
-          jobId: newestCompleted.id,
-          type: newestCompleted.type,
-        });
         setLatestResultUrl(newestCompleted.resultUrl);
         if (newestCompleted.type) setLatestResultType(newestCompleted.type);
       }
@@ -324,7 +311,6 @@ export function GenerateClient({
   useEffect(() => {
     if (activeJobIds.length === 0) return;
 
-    console.info("[PRIZM][queue] poll loop started", { activeJobCount: activeJobIds.length });
     void poll();
     const intervalId = setInterval(() => void poll(), SLOW_POLL_MS);
 

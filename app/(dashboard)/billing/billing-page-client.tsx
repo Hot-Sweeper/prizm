@@ -32,7 +32,6 @@ export function BillingPageClient() {
         });
 
         if (!response.ok) {
-          console.error("[PRIZM][billing] overview fetch failed", response.status);
           return;
         }
 
@@ -50,8 +49,8 @@ export function BillingPageClient() {
           setBalances({ image: data.balances.image, video: data.balances.video });
         }
       } catch (error) {
-        if (!cancelled) {
-          console.error("[PRIZM][billing] overview fetch threw", error);
+        if (!cancelled && !(error instanceof DOMException && error.name === "AbortError")) {
+          console.error("billing overview fetch failed", error);
         }
       } finally {
         timeout.clear();

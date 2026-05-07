@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Bebas_Neue, Plus_Jakarta_Sans } from "next/font/google";
-import { DebugMonitor } from "@/components/features/generation/debug-monitor";
 import "./globals.css";
 
 const displayFont = Bebas_Neue({
@@ -35,7 +34,6 @@ export default function RootLayout({
           Skip to main content
         </a>
         {children}
-        <DebugMonitor />
       </body>
     </html>
   );

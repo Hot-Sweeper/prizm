@@ -82,11 +82,6 @@ export function GenerationForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
 
-  useEffect(() => {
-    console.warn("[PRIZM][debug] generation form logger active", {
-      timestamp: new Date().toISOString(),
-    });
-  }, []);
 
   const creditCost = modelId ? getModelCreditCost(modelId) : 0;
   const selectedModel = modelId ? getModelInfo(modelId) : null;
@@ -198,12 +193,6 @@ export function GenerationForm({
 
     setIsSubmitting(true);
     setError(null);
-    console.info("[PRIZM][generate] submit started", {
-      type,
-      modelId,
-      promptLength: prompt.trim().length,
-      attachedImages: attachedImages.length,
-    });
 
     try {
       let imageData: string[] | undefined;
@@ -237,16 +226,8 @@ export function GenerationForm({
       timeout.clear();
 
       const data = await response.json();
-      console.info("[PRIZM][generate] response received", {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-        bodyStatus: data?.status,
-        jobId: data?.jobId,
-      });
 
       if (!response.ok) {
-        console.error("[PRIZM][generate] request failed", data);
         setError(data.error ?? "Generation failed. Please try again.");
         return;
       }
@@ -261,15 +242,13 @@ export function GenerationForm({
 
       // Queued generation: normal pipeline
       onJobCreated(data.jobId as string, prompt.trim(), type, modelId);
-      console.info("[PRIZM][generate] queued job created", {
-        jobId: data.jobId,
-        type,
-        modelId,
-      });
       setPrompt("");
       clearAttachedImages();
     } catch (error) {
-      console.error("[PRIZM][generate] network/client exception", error);
+        if (error instanceof DOMException && error.name === "AbortError") {
+          setError("Request timed out. Please try again.");
+          return;
+        }
       setError("Request timed out or failed. Please try again.");
     } finally {
       setIsSubmitting(false);

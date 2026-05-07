@@ -39,7 +39,6 @@ export function GalleryPageClient() {
         });
 
         if (!response.ok) {
-          console.error("[PRIZM][gallery] fetch failed", response.status);
           return;
         }
 
@@ -48,8 +47,8 @@ export function GalleryPageClient() {
           setJobs(data.jobs);
         }
       } catch (error) {
-        if (!cancelled) {
-          console.error("[PRIZM][gallery] fetch threw", error);
+        if (!cancelled && !(error instanceof DOMException && error.name === "AbortError")) {
+          console.error("gallery fetch failed", error);
         }
       } finally {
         timeout.clear();
