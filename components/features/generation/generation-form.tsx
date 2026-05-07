@@ -666,15 +666,13 @@ export function GenerationForm({
             ))}
           </div>
 
-          <div style={{ minWidth: "240px" }}>
-            <ModelPicker
-              models={availableModels}
-              value={modelId}
-              onChange={handleModelChange}
-              userTier={userTier}
-              isWhitelisted={isWhitelisted}
-            />
-          </div>
+          <ModelPicker
+            models={availableModels}
+            value={modelId}
+            onChange={handleModelChange}
+            userTier={userTier}
+            isWhitelisted={isWhitelisted}
+          />
 
           <SettingsPills
             profile={activeProfile}

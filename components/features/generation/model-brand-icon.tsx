@@ -1,10 +1,5 @@
 import type { ModelInfo } from "@/lib/ai/models";
 
-interface ModelBrandIconProps {
-  model: ModelInfo;
-  active?: boolean;
-}
-
 function BrandGlyph({ familyKey }: { familyKey: ModelInfo["familyKey"] }) {
   switch (familyKey) {
     case "openai":
@@ -85,8 +80,34 @@ function BrandGlyph({ familyKey }: { familyKey: ModelInfo["familyKey"] }) {
   }
 }
 
-export function ModelBrandIcon({ model, active = false }: ModelBrandIconProps) {
+interface ModelBrandIconProps {
+  model: ModelInfo;
+  active?: boolean;
+  bare?: boolean; // When true, renders just the icon without the surrounding box
+}
+
+export function ModelBrandIcon({ model, active = false, bare = false }: ModelBrandIconProps) {
   const iconUrl = model.iconUrl ?? model.brandIconUrl;
+
+  const icon = iconUrl ? (
+    <img
+      src={iconUrl}
+      alt=""
+      width={16}
+      height={16}
+      style={{ width: "16px", height: "16px", objectFit: "contain", flexShrink: 0 }}
+    />
+  ) : (
+    <BrandGlyph familyKey={model.familyKey} />
+  );
+
+  if (bare) {
+    return (
+      <span aria-hidden style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "rgba(255,255,255,0.85)" }}>
+        {icon}
+      </span>
+    );
+  }
 
   return (
     <span
@@ -104,17 +125,7 @@ export function ModelBrandIcon({ model, active = false }: ModelBrandIconProps) {
         flexShrink: 0,
       }}
     >
-      {iconUrl ? (
-        <img
-          src={iconUrl}
-          alt=""
-          width={14}
-          height={14}
-          style={{ width: "14px", height: "14px", objectFit: "contain" }}
-        />
-      ) : (
-        <BrandGlyph familyKey={model.familyKey} />
-      )}
+      {icon}
     </span>
   );
 }

@@ -50,24 +50,24 @@ export function ModelPicker({ models, value, onChange, userTier, isWhitelisted =
         aria-expanded={isOpen}
         style={{
           display: "flex", alignItems: "center", gap: "8px",
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.07)",
+          background: "rgba(255,255,255,0.05)",
+          border: "1px solid rgba(255,255,255,0.08)",
           borderRadius: "999px",
-          padding: "8px 14px",
+          padding: "9px 14px",
           color: "#fff",
           cursor: "pointer",
           transition: "background 0.15s",
         }}
       >
         {activeModelInfo ? (
-          <ModelBrandIcon model={activeModelInfo} active />
+          <ModelBrandIcon model={activeModelInfo} bare />
         ) : (
-          <Cpu size={14} style={{ color: "rgba(255,255,255,0.4)" }} />
+          <Cpu size={16} style={{ color: "rgba(255,255,255,0.4)", flexShrink: 0 }} />
         )}
-        <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>
+        <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>
           {activeModelInfo?.displayName || "Select Model"}
         </span>
-        <CaretUp size={12} weight="bold" style={{ color: "rgba(255,255,255,0.4)", transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+        <CaretUp size={11} weight="bold" style={{ color: "rgba(255,255,255,0.4)", transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
       </button>
 
       {/* Dropdown Menu */}
