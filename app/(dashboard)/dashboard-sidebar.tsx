@@ -28,6 +28,7 @@ export function DashboardSidebar() {
     >
       <Link
         href="/"
+        prefetch={false}
         aria-label="Go to PRIZM home page"
         style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", textDecoration: "none", marginBottom: "2rem" }}
       >

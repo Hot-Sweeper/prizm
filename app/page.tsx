@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { PrizmLogo } from "@/components/prizm-logo";
-import { auth } from "@/auth";
 import type { Metadata } from "next";
 import {
   ArrowRight,
@@ -78,9 +77,8 @@ const BG = "#030303";
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default async function LandingPage() {
-  const session = await auth();
-  const dashHref = session ? "/generate" : "/login";
+export default function LandingPage() {
+  const dashHref = "/generate";
 
   return (
     <div style={{ background: BG, color: "#fff", fontFamily: "var(--font-sans)", overflowX: "hidden" }}>
@@ -122,7 +120,7 @@ export default async function LandingPage() {
                 boxShadow: `0 0 24px ${V}55`,
               }}
             >
-              {session ? "Dashboard" : "Start Free"}
+              Start Free
               <ArrowRight size={14} aria-hidden />
             </Link>
           </nav>
