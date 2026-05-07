@@ -154,13 +154,15 @@ export function GenerateClient({
   // poll function without the interval itself needing to restart on every
   // state change (which was causing the infinite tear-down/restart bug).
   const activeJobIdsRef = useRef(activeJobIds);
-  useEffect(() => { activeJobIdsRef.current = activeJobIds; });
+  const pollInFlightRef = useRef(false);
+  useEffect(() => {
+    activeJobIdsRef.current = activeJobIds;
+  }, [activeJobIds]);
 
   const poll = useCallback(async () => {
     const ids = activeJobIdsRef.current;
-    if (ids.length === 0) return;
-
-    console.info("[PRIZM][queue] polling", { jobCount: ids.length, ids });
+    if (ids.length === 0 || pollInFlightRef.current) return;
+    pollInFlightRef.current = true;
 
     try {
       const timeout = createTimeoutSignal(FETCH_TIMEOUT_MS);
@@ -190,15 +192,12 @@ export function GenerateClient({
         invalidJobIds?: string[];
       };
 
-      console.info("[PRIZM][queue] poll response", {
-        jobCount: data.jobs?.length ?? 0,
-        statuses: data.jobs?.map((j) => ({ id: j.id, status: j.status })),
-        invalidJobIds: data.invalidJobIds,
-      });
-
       if (Array.isArray(data.invalidJobIds) && data.invalidJobIds.length > 0) {
         const invalidSet = new Set(data.invalidJobIds);
-        setActiveJobIds((prev) => prev.filter((id) => !invalidSet.has(id)));
+        setActiveJobIds((prev) => {
+          const next = prev.filter((id) => !invalidSet.has(id));
+          return next.length === prev.length ? prev : next;
+        });
       }
 
       if (!Array.isArray(data.jobs) || data.jobs.length === 0) return;
@@ -226,26 +225,52 @@ export function GenerateClient({
 
       setHistory((prev) => {
         const updates = new Map(data.jobs.map((job) => [job.id, job]));
-        return prev.map((job) => {
+        let changed = false;
+        const next = prev.map((job) => {
           const update = updates.get(job.id);
           if (!update) return job;
+          const nextStatus = update.status;
+          const nextType = update.type ?? job.type;
+          const nextPrompt = update.prompt ?? job.prompt;
+          const nextResultUrl = update.resultUrl;
+          const nextErrorMessage = update.errorMessage;
+          const nextUpdatedAt = update.updatedAt ?? job.updatedAt;
+
+          if (
+            job.status === nextStatus &&
+            job.type === nextType &&
+            job.prompt === nextPrompt &&
+            job.resultUrl === nextResultUrl &&
+            job.errorMessage === nextErrorMessage &&
+            job.updatedAt === nextUpdatedAt
+          ) {
+            return job;
+          }
+
+          changed = true;
           return {
             ...job,
-            status: update.status,
-            type: update.type ?? job.type,
-            prompt: update.prompt ?? job.prompt,
-            resultUrl: update.resultUrl,
-            errorMessage: update.errorMessage,
-            updatedAt: update.updatedAt ?? job.updatedAt,
+            status: nextStatus,
+            type: nextType,
+            prompt: nextPrompt,
+            resultUrl: nextResultUrl,
+            errorMessage: nextErrorMessage,
+            updatedAt: nextUpdatedAt,
           };
         });
+        return changed ? next : prev;
       });
 
       if (completedOrFailedIds.size > 0) {
-        setActiveJobIds((prev) => prev.filter((id) => !completedOrFailedIds.has(id)));
+        setActiveJobIds((prev) => {
+          const next = prev.filter((id) => !completedOrFailedIds.has(id));
+          return next.length === prev.length ? prev : next;
+        });
       }
     } catch (error) {
       console.error("[PRIZM][queue] poll threw error", error);
+    } finally {
+      pollInFlightRef.current = false;
     }
   // poll itself has no reactive deps — it reads activeJobIds via ref
   // eslint-disable-next-line react-hooks/exhaustive-deps

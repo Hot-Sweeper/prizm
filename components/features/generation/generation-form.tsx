@@ -54,6 +54,13 @@ const DEFAULT_MODELS: Record<GenerationType, string> = {
 };
 
 const MAX_PROMPT_LENGTH = 500;
+const GENERATE_REQUEST_TIMEOUT_MS = 15000;
+
+function createTimeoutSignal(timeoutMs: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return { signal: controller.signal, clear: () => clearTimeout(timeoutId) };
+}
 
 export function GenerationForm({
   userTier,
@@ -214,9 +221,11 @@ export function GenerationForm({
         );
       }
 
+      const timeout = createTimeoutSignal(GENERATE_REQUEST_TIMEOUT_MS);
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: timeout.signal,
         body: JSON.stringify({
           prompt: prompt.trim(),
           modelId,
@@ -225,6 +234,7 @@ export function GenerationForm({
           ...(imageData && { referenceImages: imageData }),
         }),
       });
+      timeout.clear();
 
       const data = await response.json();
       console.info("[PRIZM][generate] response received", {
@@ -260,7 +270,7 @@ export function GenerationForm({
       clearAttachedImages();
     } catch (error) {
       console.error("[PRIZM][generate] network/client exception", error);
-      setError("Network error. Please check your connection and try again.");
+      setError("Request timed out or failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
