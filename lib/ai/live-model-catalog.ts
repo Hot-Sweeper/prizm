@@ -212,7 +212,11 @@ function normalizeRecord(model: CometApiModelRecord): LiveModelCatalogEntry | nu
   const provider = model.provider ?? "CometAPI";
   const providerCode = (model.provider_code ?? provider).toLowerCase();
   const familyKey = inferFamilyKey(model.id);
-  const brandIconUrl = getBrandIconUrl(providerCode) ?? getBrandIconUrl(provider);
+  // Prefer the explicit provider code from Comet catalog over model-id inference for icons
+  const brandIconUrl =
+    getBrandIconUrl(providerCode) ??
+    getBrandIconUrl(provider.toLowerCase()) ??
+    getBrandIconUrl(familyKey);
   const transport = inferTransport(model.id, type);
   const baseInfo: LiveModelCatalogEntry = {
     id: model.id,

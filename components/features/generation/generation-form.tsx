@@ -6,7 +6,7 @@ import { ModelPicker } from "./model-picker";
 import { getModelCreditCost, type ModelInfo } from "@/lib/ai/models";
 import type { ModelCapabilityProfile } from "@/lib/ai/model-capabilities";
 import { buildDefaultSettings } from "@/lib/ai/model-capabilities";
-import { DynamicModelSettings } from "./dynamic-model-settings";
+import { SettingsPills } from "./settings-pills";
 import { Spinner } from "@/components/ui/spinner";
 import TextareaAutosize from "react-textarea-autosize";
 import NextImage from "next/image";
@@ -570,12 +570,6 @@ export function GenerationForm({
         </div>
       )}
 
-      <DynamicModelSettings
-        profile={activeProfile}
-        settings={settings}
-        onChange={handleSettingChange}
-      />
-
       {/* Bottom Tool Strip */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1rem", position: "relative", flexWrap: "wrap" }}>
         
@@ -681,6 +675,12 @@ export function GenerationForm({
               isWhitelisted={isWhitelisted}
             />
           </div>
+
+          <SettingsPills
+            profile={activeProfile}
+            settings={settings}
+            onChange={handleSettingChange}
+          />
         </div>
 
         {/* Generate Button */}

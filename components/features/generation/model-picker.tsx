@@ -59,7 +59,11 @@ export function ModelPicker({ models, value, onChange, userTier, isWhitelisted =
           transition: "background 0.15s",
         }}
       >
-        <Cpu size={14} style={{ color: "rgba(255,255,255,0.4)" }} />
+        {activeModelInfo ? (
+          <ModelBrandIcon model={activeModelInfo} active />
+        ) : (
+          <Cpu size={14} style={{ color: "rgba(255,255,255,0.4)" }} />
+        )}
         <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>
           {activeModelInfo?.displayName || "Select Model"}
         </span>
