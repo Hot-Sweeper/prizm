@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { GenerationForm } from "@/components/features/generation/generation-form";
 import { QueueStatus } from "@/components/features/generation/queue-status";
 import { HistoryCard } from "@/components/features/generation/history-card";
@@ -58,7 +58,6 @@ interface GenerateClientProps {
 }
 
 const VL = "var(--color-secondary)";
-const FAST_POLL_MS = 2000;
 const SLOW_POLL_MS = 4500;
 const FETCH_TIMEOUT_MS = 8000;
 
@@ -151,8 +150,17 @@ export function GenerateClient({
     setHistory((prev) => [newJob, ...prev]);
   }
 
-  const pollQueueStatuses = useCallback(async () => {
-    if (activeJobIds.length === 0) return;
+  // Stable ref so the interval closure always calls the latest version of the
+  // poll function without the interval itself needing to restart on every
+  // state change (which was causing the infinite tear-down/restart bug).
+  const activeJobIdsRef = useRef(activeJobIds);
+  useEffect(() => { activeJobIdsRef.current = activeJobIds; });
+
+  const poll = useCallback(async () => {
+    const ids = activeJobIdsRef.current;
+    if (ids.length === 0) return;
+
+    console.info("[PRIZM][queue] polling", { jobCount: ids.length, ids });
 
     try {
       const timeout = createTimeoutSignal(FETCH_TIMEOUT_MS);
@@ -160,8 +168,9 @@ export function GenerateClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
+        credentials: "include",
         signal: timeout.signal,
-        body: JSON.stringify({ jobIds: activeJobIds }),
+        body: JSON.stringify({ jobIds: ids }),
       });
       timeout.clear();
 
@@ -170,7 +179,7 @@ export function GenerateClient({
         console.error("[PRIZM][queue] batch poll failed", {
           status: res.status,
           statusText: res.statusText,
-          activeJobIds,
+          ids,
           errorBody,
         });
         return;
@@ -181,10 +190,13 @@ export function GenerateClient({
         invalidJobIds?: string[];
       };
 
+      console.info("[PRIZM][queue] poll response", {
+        jobCount: data.jobs?.length ?? 0,
+        statuses: data.jobs?.map((j) => ({ id: j.id, status: j.status })),
+        invalidJobIds: data.invalidJobIds,
+      });
+
       if (Array.isArray(data.invalidJobIds) && data.invalidJobIds.length > 0) {
-        console.warn("[PRIZM][queue] removing invalid job IDs from active queue", {
-          invalidJobIds: data.invalidJobIds,
-        });
         const invalidSet = new Set(data.invalidJobIds);
         setActiveJobIds((prev) => prev.filter((id) => !invalidSet.has(id)));
       }
@@ -204,7 +216,7 @@ export function GenerateClient({
       }
 
       if (newestCompleted?.resultUrl) {
-        console.info("[PRIZM][queue] newest completed job", {
+        console.info("[PRIZM][queue] job completed", {
           jobId: newestCompleted.id,
           type: newestCompleted.type,
         });
@@ -230,39 +242,28 @@ export function GenerateClient({
       });
 
       if (completedOrFailedIds.size > 0) {
-        console.info("[PRIZM][queue] removing finished jobs from active list", {
-          finishedCount: completedOrFailedIds.size,
-        });
         setActiveJobIds((prev) => prev.filter((id) => !completedOrFailedIds.has(id)));
       }
     } catch (error) {
       console.error("[PRIZM][queue] poll threw error", error);
-      // Keep polling loop resilient to transient network failures.
     }
-  }, [activeJobIds]);
+  // poll itself has no reactive deps — it reads activeJobIds via ref
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Only restart the interval when the NUMBER of active jobs changes.
+  // Do NOT include poll or activeJobs in deps — that caused the interval to
+  // tear down and restart on every state update, effectively never firing.
   useEffect(() => {
     if (activeJobIds.length === 0) return;
 
-    const initialKickoff = setTimeout(() => {
-      void pollQueueStatuses();
-    }, 50);
+    console.info("[PRIZM][queue] poll loop started", { activeJobCount: activeJobIds.length });
+    void poll();
+    const intervalId = setInterval(() => void poll(), SLOW_POLL_MS);
 
-    const hasProcessing = activeJobs.some((job) => job.status === "processing");
-    const intervalMs = hasProcessing ? FAST_POLL_MS : SLOW_POLL_MS;
-    console.info("[PRIZM][queue] poll loop started", {
-      activeJobs: activeJobIds.length,
-      intervalMs,
-    });
-    const intervalId = setInterval(() => {
-      void pollQueueStatuses();
-    }, intervalMs);
-
-    return () => {
-      clearTimeout(initialKickoff);
-      clearInterval(intervalId);
-    };
-  }, [activeJobIds.length, activeJobs, pollQueueStatuses]);
+    return () => clearInterval(intervalId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeJobIds.length]);
 
   return (
     <div style={{ flex: 1, display: "flex", height: "100%", overflow: "hidden", width: "100%" }}>
