@@ -69,13 +69,30 @@ export function GalleryPageClient() {
   }));
 
   return (
-    <main id="maincontent" tabIndex={-1} style={{ maxWidth: "1280px", margin: "0 auto", padding: "2rem 1.5rem", width: "100%", overflowY: "auto", height: "100%" }}>
-      <h1 className="font-display" style={{ fontSize: "2rem", letterSpacing: "0.06em", color: "#fff", marginBottom: "1.75rem" }}>
-        GALLERY
-      </h1>
+    <main id="maincontent" tabIndex={-1} className="mx-auto flex h-full w-full max-w-[1400px] flex-col gap-8 overflow-y-auto px-6 py-8 lg:px-10">
+      <header className="space-y-3">
+        <p className="text-xs font-medium uppercase tracking-[0.28em] text-neutral-500">
+          Creative archive
+        </p>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <h1 className="font-display text-4xl tracking-[0.08em] text-neutral-50 sm:text-5xl">
+              Gallery
+            </h1>
+            <p className="max-w-2xl text-sm leading-7 text-neutral-400 sm:text-base">
+              Every render lands here with its status, credits used, and a clean download action when it is ready.
+            </p>
+          </div>
+          <div className="rounded-full border border-neutral-800 bg-neutral-900/80 px-4 py-2 text-sm text-neutral-300">
+            {normalized.length} {normalized.length === 1 ? "asset" : "assets"}
+          </div>
+        </div>
+      </header>
 
       {loading ? (
-        <p className="text-center text-sm text-neutral-500 py-12">Loading gallery...</p>
+        <p className="rounded-[1.6rem] border border-neutral-800 bg-neutral-900/60 px-6 py-16 text-center text-sm leading-7 text-neutral-400">
+          Loading gallery...
+        </p>
       ) : (
         <GalleryGrid jobs={normalized} />
       )}

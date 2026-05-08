@@ -18,7 +18,7 @@ interface GalleryGridProps {
 export function GalleryGrid({ jobs }: GalleryGridProps) {
   if (jobs.length === 0) {
     return (
-      <p className="text-center text-sm text-neutral-500 py-12">
+      <p className="rounded-[1.6rem] border border-dashed border-neutral-800 bg-neutral-900/60 px-6 py-16 text-center text-sm leading-7 text-neutral-400">
         No generations yet. Create your first one!
       </p>
     );
@@ -28,10 +28,10 @@ export function GalleryGrid({ jobs }: GalleryGridProps) {
     <ul
       role="list"
       aria-label="Your generations"
-      className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+      className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
     >
       {jobs.map((job) => (
-        <li key={job.id}>
+        <li key={job.id} className="h-full">
           <GenerationCard {...job} />
         </li>
       ))}
