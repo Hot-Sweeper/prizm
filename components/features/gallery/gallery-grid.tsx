@@ -28,7 +28,7 @@ export function GalleryGrid({ jobs }: GalleryGridProps) {
     <ul
       role="list"
       aria-label="Your generations"
-      className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+      className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]"
     >
       {jobs.map((job) => (
         <li key={job.id}>
